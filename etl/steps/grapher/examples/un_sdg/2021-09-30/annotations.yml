@@ -1,0 +1,18 @@
+dataset:
+  source: examples/un_sdg/2021-09-30/un_sdg
+  short_name: un_sdg-2021-09-30
+  namespace: examples
+
+dimensions:
+  education_level:
+  sex:
+
+variables:
+  se_tot_prfl:
+    description: Proportion of children and young people achieving a minimum proficiency level in reading and mathematics (%)
+    unit: percentage
+    short_unit:
+  se_tot_gpi:
+    description: Adjusted gender parity index for achieving a minimum proficiency level in reading and mathematics (ratio)
+    unit: ratio
+    short_unit:
