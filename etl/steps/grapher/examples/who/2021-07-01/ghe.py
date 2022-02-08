@@ -55,4 +55,4 @@ def get_grapher_tables(dataset: catalog.Dataset) -> Iterable[catalog.Table]:
     table = gh.as_table(table, orig_table)
     table = gh.annotate_table_from_yaml(table, annotations_path)
 
-    yield from gh.yield_table(table)
+    yield from gh.yield_wide_table(table)

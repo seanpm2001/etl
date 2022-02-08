@@ -37,30 +37,27 @@ def get_grapher_tables(dataset: catalog.Dataset) -> Iterable[catalog.Table]:
     table["year"] = table["TimePeriod"].astype(int)
     table["entity_id"] = table["legacy_entity_id"].astype(int)
 
-    dimensions = [
+    table = table.rename(
+        columns={
+            "[Education level]": "education_level",
+            "[Sex]": "sex",
+            "Value": "value",
+            "SeriesCode": "variable",
+        }
+    )
+
+    # Filter only variables of interest
+    table.variable = table.variable.str.lower()
+    table = table.loc[table.variable.isin({"se_tot_gpi", "se_tot_prfl"})]
+
+    table = table.set_index([
         "entity_id",
         "year",
         "education_level",
         "sex",
-    ]
+    ])[['value', 'variable']]
 
-    # TODO: Would be nice to have a support for both long and wide tables in `yield_table`
-    for series_code in {"SE_TOT_GPI", "SE_TOT_PRFL"}:
-        t = table.loc[table.SeriesCode == series_code]
+    table = gh.as_table(table, dataset["math_skills"])
+    annot = gh.Annotation.load_from_yaml(annotations_path)
 
-        t = t.rename(
-            columns={
-                "[Education level]": "education_level",
-                "[Sex]": "sex",
-                "Value": series_code.lower(),
-            }
-        )
-
-        t = t.set_index(
-            dimensions,
-        )[[series_code.lower()]]
-
-        t = gh.as_table(t, dataset["math_skills"])
-        t = gh.annotate_table_from_yaml(t, annotations_path, missing_col='ignore')
-
-        yield from gh.yield_table(t)
+    yield from gh.yield_wide_table(table, annot)
