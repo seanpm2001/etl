@@ -10,9 +10,9 @@ annotations_path = Path(__file__).parent / "annotations.yml"
 
 
 def get_grapher_dataset() -> catalog.Dataset:
-    dataset = catalog.Dataset(DATA_DIR / 'examples/un_sdg/2021-09-30/un_sdg')
-    dataset.metadata.short_name = 'un_sdg-2021-09-30'
-    dataset.metadata.namespace = 'examples'
+    dataset = catalog.Dataset(DATA_DIR / "examples/un_sdg/2021-09-30/un_sdg")
+    dataset.metadata.short_name = "un_sdg-2021-09-30"
+    dataset.metadata.namespace = "examples"
     return dataset
 
 
@@ -50,14 +50,16 @@ def get_grapher_tables(dataset: catalog.Dataset) -> Iterable[catalog.Table]:
     table.variable = table.variable.str.lower()
     table = table.loc[table.variable.isin({"se_tot_gpi", "se_tot_prfl"})]
 
-    table = table.set_index([
-        "entity_id",
-        "year",
-        "education_level",
-        "sex",
-    ])[['value', 'variable']]
+    table = table.set_index(
+        [
+            "entity_id",
+            "year",
+            "education_level",
+            "sex",
+        ]
+    )[["value", "variable"]]
 
     table = gh.as_table(table, dataset["math_skills"])
     annot = gh.Annotation.load_from_yaml(annotations_path)
 
-    yield from gh.yield_wide_table(table, annot)
+    yield from gh.yield_long_table(table, annot)
