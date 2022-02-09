@@ -43,10 +43,11 @@ from etl.grapher_import import upsert_table, upsert_dataset
 
 Graph = Dict[str, Set[str]]
 DAG = Dict[str, Any]
+Sources = Dict[str, Any]
 
 
 def compile_steps(
-    dag: DAG, includes: Optional[List[str]] = None, excludes: Optional[List[str]] = None
+    dag: DAG, sources: Sources,includes: Optional[List[str]] = None, excludes: Optional[List[str]] = None
 ) -> List["Step"]:
     """
     Return the list of steps which, if executed in order, mean that every
@@ -59,7 +60,7 @@ def compile_steps(
     steps = to_dependency_order(dag, includes, excludes)
 
     # parse the steps into Python objects
-    return [parse_step(name, dag) for name in steps]
+    return [parse_step(name, dag, sources) for name in steps]
 
 
 def to_dependency_order(
@@ -92,6 +93,11 @@ def load_dag(filename: Union[str, Path] = paths.DAG_FILE) -> Dict[str, Any]:
 
     dag = {node: set(deps) if deps else set() for node, deps in dag["steps"].items()}
     return dag
+
+
+def load_sources(filename: Union[str, Path] = paths.DAG_FILE) -> Dict[str, Any]:
+    with open(str(filename)) as istream:
+        return yaml.safe_load(istream).get("sources", {})
 
 
 def reverse_graph(graph: Graph) -> Graph:
@@ -171,31 +177,43 @@ def topological_sort(graph: Graph) -> List[str]:
     return list(reversed(list(graphlib.TopologicalSorter(graph).static_order())))
 
 
-def parse_step(step_name: str, dag: Dict[str, Any]) -> "Step":
-    "Convert each step's name into a step object that we can run."
+def _parse_step_name(step_name: str):
+    if '@' in step_name:
+        source = re.search(r'@(.*?):', step_name)[1]
+        step_name = re.sub(r'@.*?:', ':', step_name)
+    else:
+        source = None
+
     parts = urlparse(step_name)
     step_type = parts.scheme
     path = parts.netloc + parts.path
-    dependencies = [parse_step(s, dag) for s in dag.get(step_name, [])]
+    return step_type, path, source
+
+
+def parse_step(step_name: str, dag: Dict[str, Any], sources: Dict[str, Any]) -> "Step":
+    "Convert each step's name into a step object that we can run."
+    step_type, path, source = _parse_step_name(step_name)
+    dependencies = [parse_step(s, dag, sources) for s in dag.get(step_name, [])]
+    source_kwargs =sources[source] if source else {}
 
     step: Step
     if step_type == "data":
         if path == "reference":
-            step = ReferenceStep(path)
+            step = ReferenceStep(path, **source_kwargs)
         else:
-            step = DataStep(path, dependencies)
+            step = DataStep(path, dependencies, **source_kwargs)
 
     elif step_type == "walden":
-        step = WaldenStep(path)
+        step = WaldenStep(path, **source_kwargs)
 
     elif step_type == "github":
-        step = GithubStep(path)
+        step = GithubStep(path, **source_kwargs)
 
     elif step_type == "etag":
-        step = ETagStep(path)
+        step = ETagStep(path, **source_kwargs)
 
     elif step_type == "grapher":
-        step = GrapherStep(path, dependencies)
+        step = GrapherStep(path, dependencies, **source_kwargs)
 
     else:
         raise Exception(f"no recipe for executing step: {step_name}")
@@ -227,9 +245,11 @@ class DataStep(Step):
     path: str
     dependencies: List[Step]
 
-    def __init__(self, path: str, dependencies: List[Step]) -> None:
+    def __init__(self, path: str, dependencies: List[Step], data_dir: Path=paths.DATA_DIR, step_dir: Path=paths.STEP_DIR) -> None:
         self.path = path
         self.dependencies = dependencies
+        self.data_dir = Path(data_dir)
+        self.step_dir = Path(step_dir)
 
     def __str__(self) -> str:
         return f"data://{self.path}"
@@ -314,18 +334,22 @@ class DataStep(Step):
 
     @property
     def _search_path(self) -> Path:
-        return paths.STEP_DIR / "data" / self.path
+        return self.step_dir / "data" / self.path
 
     @property
     def _dest_dir(self) -> Path:
-        return paths.DATA_DIR / self.path.lstrip("/")
+        return self.data_dir / self.path.lstrip("/")
 
     def _run_py(self) -> None:
         """
         Import the Python module for this step and call run() on it.
         """
         module_path = self.path.lstrip("/").replace("/", ".")
-        step_module = import_module(f"etl.steps.data.{module_path}")
+        if self.step_dir == paths.STEP_DIR:
+            step_module = import_module(f"etl.steps.data.{module_path}")
+        else:
+            step_module = import_module(f"{self.step_dir}.data.{module_path}")
+
         if not hasattr(step_module, "run"):
             raise Exception(f'no run() method defined for module "{step_module}"')
 
@@ -356,8 +380,9 @@ class ReferenceStep(DataStep):
     the local dataset and trigger rebuilds if the local dataset changes.
     """
 
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: str, data_dir: Path=paths.DATA_DIR) -> None:
         self.path = path
+        self.data_dir = data_dir
         self.dependencies = []
 
     def is_dirty(self) -> bool:
@@ -374,8 +399,9 @@ class ReferenceStep(DataStep):
 class WaldenStep(Step):
     path: str
 
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: str, index_dir: str=None) -> None:
         self.path = path
+        self.index_dir = index_dir
 
     def __str__(self) -> str:
         return f"walden://{self.path}"
@@ -404,7 +430,7 @@ class WaldenStep(Step):
             raise ValueError(f"malformed walden path: {self.path}")
 
         namespace, version, short_name = self.path.split("/")
-        catalog = walden.Catalog()
+        catalog = walden.Catalog(index_dir=self.index_dir)
 
         # normally version is a year or date, but we also accept "latest"
         if version == "latest":

@@ -10,7 +10,7 @@ from pathlib import Path
 
 import click
 
-from etl.steps import load_dag, compile_steps, DAG, paths
+from etl.steps import load_dag, load_sources, compile_steps, DAG, Sources, paths
 from etl import config
 
 
@@ -41,12 +41,14 @@ def main(
 
     # Load our graph of steps and the things they depend on
     dag = load_dag(dag_path)
+    sources = load_sources(dag_path)
 
     excludes = exclude.split(",") if exclude else []
 
     # Run the steps we have selected, and everything downstream of them
     run_dag(
         dag,
+        sources,
         steps,
         dry_run=dry_run,
         force=force,
@@ -67,6 +69,7 @@ def sanity_check_db_settings() -> None:
 
 def run_dag(
     dag: DAG,
+    sources: Sources,
     includes: Optional[List[str]] = None,
     dry_run: bool = False,
     force: bool = False,
@@ -84,7 +87,7 @@ def run_dag(
     if not include_grapher:
         excludes.append("grapher://")
 
-    steps = compile_steps(dag, includes, excludes)
+    steps = compile_steps(dag, sources, includes, excludes)
 
     if not force:
         print("Detecting which steps need rebuilding...")

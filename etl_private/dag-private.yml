@@ -1,0 +1,14 @@
+steps:
+  data@private_catalog://private/who/2021-07-01/private_ghe:
+      - data://garden/who/2021-07-01/ghe
+      # private walden index is not ready yet and might not even be supported
+      # - walden@private_walden://_private_test/2021/private_test
+      - walden://_private_test/2021/private_test
+      - data://reference
+
+sources:
+  private_catalog:
+    data_dir: ./private_catalog
+    step_dir: ./private_steps
+  private_walden:
+    index_dir: ./private_walden_index
