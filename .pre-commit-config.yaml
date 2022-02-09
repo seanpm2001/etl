@@ -5,3 +5,11 @@ repos:
       name: format
       entry: make format
       language: system
+    - id: lint
+      name: lint
+      entry: make lint
+      language: system
+    - id: check-typing
+      name: check-typing
+      entry: make check-typing
+      language: system

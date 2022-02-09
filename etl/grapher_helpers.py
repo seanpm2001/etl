@@ -5,18 +5,18 @@ import yaml
 import slugify
 from pathlib import Path
 
-from etl.paths import DATA_DIR
-
-from typing import Optional, Dict, Literal, cast
+from typing import Optional, Dict, Literal, cast, List, Any
 from pydantic import BaseModel
 
 
+# TODO: remove if it turns out to be useless for real examples
 class DatasetModel(BaseModel):
     source: str
     short_name: str
     namespace: str
 
 
+# TODO: remove if it turns out to be useless for real examples
 class DimensionModel(BaseModel):
     pass
 
@@ -27,34 +27,29 @@ class VariableModel(BaseModel):
     short_unit: Optional[str]
 
 
-# TODO: prune unnecessary stuff
 class Annotation(BaseModel):
     dataset: Optional[DatasetModel]
     dimensions: Optional[Dict[str, Optional[DimensionModel]]]
     variables: Dict[str, VariableModel]
 
     @property
-    def dimension_names(self):
-        return list(self.dimensions.keys())
+    def dimension_names(self) -> List[str]:
+        if self.dimensions:
+            return list(self.dimensions.keys())
+        else:
+            return []
 
     @property
-    def variable_names(self):
+    def variable_names(self) -> List[str]:
         return list(self.variables.keys())
 
     @classmethod
-    def load_from_yaml(cls, path):
+    def load_from_yaml(cls, path: Path) -> "Annotation":
         # Load variable descriptions and units from the annotations.yml file and
         # store them as column metadata
         with open(path) as istream:
             annotations = yaml.safe_load(istream)
         return cls.parse_obj(annotations)
-
-    def create_dataset(self) -> catalog.Dataset:
-        # TODO: we already have this dataset path... can we reuse it?
-        dataset = catalog.Dataset(DATA_DIR / self.dataset.source)
-        dataset.metadata.short_name = self.dataset.short_name
-        dataset.metadata.namespace = self.dataset.namespace
-        return dataset
 
 
 def as_table(df: pd.DataFrame, table: catalog.Table) -> catalog.Table:
@@ -66,20 +61,26 @@ def as_table(df: pd.DataFrame, table: catalog.Table) -> catalog.Table:
     return t
 
 
-def annotate_table_from_yaml(table: catalog.Table, path: Path, **kwargs) -> catalog.Table:
+def annotate_table_from_yaml(
+    table: catalog.Table, path: Path, **kwargs: Any
+) -> catalog.Table:
     """Load variable descriptions and units from the annotations.yml file and
     store them as column metadata."""
     annot = Annotation.load_from_yaml(path)
     return annotate_table(table, annot, **kwargs)
 
 
-def annotate_table(table: catalog.Table, annot: Annotation, missing_col:Literal["raise", "ignore"]='raise') -> catalog.Table:
+def annotate_table(
+    table: catalog.Table,
+    annot: Annotation,
+    missing_col: Literal["raise", "ignore"] = "raise",
+) -> catalog.Table:
     for column in annot.variable_names:
         v = annot.variables[column]
         if column not in table:
-            if missing_col == 'raise':
+            if missing_col == "raise":
                 raise Exception(f"Column {column} not in table")
-            elif missing_col != 'ignore':
+            elif missing_col != "ignore":
                 raise ValueError(f"Unknown missing_col value: {missing_col}")
         else:
             # overwrite metadata
@@ -95,12 +96,12 @@ def yield_wide_table(table: catalog.Table) -> Iterable[catalog.Table]:
     every combination that cuts out only the data points for a specific combination of these 3 dimensions
     Grapher can only handle 2 dimensions (year and entityId)"""
     # Validation
-    if 'year' not in table.primary_key:
-        raise Exception(f"Table is missing `year` primary key")
-    if 'entity_id' not in table.primary_key:
-        raise Exception(f"Table is missing `entity_id` primary key")
+    if "year" not in table.primary_key:
+        raise Exception("Table is missing `year` primary key")
+    if "entity_id" not in table.primary_key:
+        raise Exception("Table is missing `entity_id` primary key")
 
-    dim_names = [k for k in table.primary_key if k not in ('year', 'entity_id')]
+    dim_names = [k for k in table.primary_key if k not in ("year", "entity_id")]
 
     for dims, table_to_yield in table.groupby(dim_names, as_index=False):
         # Now iterate over every column in the original dataset and export the
@@ -117,32 +118,36 @@ def yield_wide_table(table: catalog.Table) -> Iterable[catalog.Table]:
                 table_to_yield[column].metadata.unit is not None
             ), "Unit should not be None here!"
 
-            print(f'Yielding table {table_to_yield.metadata.short_name}')
+            print(f"Yielding table {table_to_yield.metadata.short_name}")
 
-            yield table_to_yield.reset_index().set_index(['entity_id', 'year'])[[column]]
+            yield table_to_yield.reset_index().set_index(["entity_id", "year"])[
+                [column]
+            ]
 
 
-def yield_long_table(table: catalog.Table, annot: Optional[Annotation]=None) -> Iterable[catalog.Table]:
+def yield_long_table(
+    table: catalog.Table, annot: Optional[Annotation] = None
+) -> Iterable[catalog.Table]:
     """Yield from long table with columns `variable`, `value` and optionally `unit`."""
-    assert set(table.columns) <= {'variable', 'value', 'unit'}
+    assert set(table.columns) <= {"variable", "value", "unit"}
 
     for var_name, t in table.groupby("variable"):
-        t = t.rename(columns={'value': var_name})
+        t = t.rename(columns={"value": var_name})
 
-        if 'unit' in t.columns:
+        if "unit" in t.columns:
             # move variable to its own column and annotate it
-            assert len(set(t['unit'])) == 1, 'units must be the same for all rows'
+            assert len(set(t["unit"])) == 1, "units must be the same for all rows"
             t[var_name].metadata.unit = t.unit.iloc[0]
 
         if annot:
-            t = annotate_table(t, annot, missing_col='ignore')
+            t = annotate_table(t, annot, missing_col="ignore")
 
-        t = t.drop(['variable', 'unit'], axis=1, errors='ignore')
+        t = t.drop(["variable", "unit"], axis=1, errors="ignore")
 
         yield from yield_wide_table(cast(catalog.Table, t))
 
 
-def dataset_table_names(ds: catalog.Dataset):
+def dataset_table_names(ds: catalog.Dataset) -> List[str]:
     """Return table names of a dataset.
     TODO: move it to Dataset as a method"""
-    return [t.metadata.short_name for t in ds]
+    return [t.metadata.short_name for t in ds if t.metadata.short_name is not None]

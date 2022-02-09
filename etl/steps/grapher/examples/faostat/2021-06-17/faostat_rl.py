@@ -2,6 +2,7 @@ import pandas as pd
 from owid import catalog
 from collections.abc import Iterable
 from pathlib import Path
+from typing import cast
 
 from etl.paths import DATA_DIR
 from etl import grapher_helpers as gh
@@ -37,23 +38,23 @@ def get_grapher_tables(dataset: catalog.Dataset) -> Iterable[catalog.Table]:
     t = gh.as_table(t, orig_table)
     annot = gh.Annotation.load_from_yaml(annotations_path)
 
-    yield from gh.yield_wide_table(t, annot=annot)
+    yield from gh.yield_long_table(t, annot=annot)
 
 
-def _extract_year(df: pd.DataFrame):
-    return df.Year.astype(int)
+def _extract_year(df: pd.DataFrame) -> pd.Series:
+    return cast(pd.Series, df.Year.astype(int))
 
 
-def _extract_unit(df: pd.DataFrame):
-    return df.Element.astype(str) + "/" + df.Unit.astype(str)
+def _extract_unit(df: pd.DataFrame) -> pd.Series:
+    return cast(pd.Series, df.Element.astype(str) + "/" + df.Unit.astype(str))
 
 
-def _extract_entity_id(df: pd.DataFrame):
+def _extract_entity_id(df: pd.DataFrame) -> pd.Series:
     reference_dataset = catalog.Dataset(DATA_DIR / "reference")
     countries_regions = reference_dataset["countries_regions"]
-    country_map = countries_regions.set_index("name")["legacy_entity_id"]  # type: ignore
-    return df.Area.map(country_map)
+    country_map = countries_regions.set_index("name")["legacy_entity_id"]
+    return cast(pd.Series, df.Area.map(country_map))
 
 
-def _cleanup(df: pd.DataFrame):
-    return df.dropna(subset=["entity_id"]).astype({'entity_id': int})
+def _cleanup(df: pd.DataFrame) -> pd.DataFrame:
+    return df.dropna(subset=["entity_id"]).astype({"entity_id": int})
