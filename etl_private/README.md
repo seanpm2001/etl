@@ -9,7 +9,7 @@ However, its metadata would still show up in the index file. The way Catalog & D
 it hard to just insert index directory as an argument, so if we ever need private walden, we'd have to restructure it
 or come up with workaround.
 
-```
+```python
 from owid.walden import Dataset
 
 local_file = 'private_test.csv'
@@ -30,7 +30,7 @@ metadata = {
 dataset = Dataset.copy_and_create(local_file, metadata)
 # send it as private file to S3
 url = dataset.upload(public=False)
-# update PUBLIC catalog
+# update PUBLIC walden index with metadata
 dataset.save()
 ```
 
@@ -42,4 +42,17 @@ Run from `etl_private` folder, make sure you have activated the virtual environm
 etl --dag-path dag-private.yml --force
 reindex --catalog ./private_catalog
 publish --catalog ./private_catalog --bucket private-owid-catalog
+```
+
+## Downloading from private catalog
+
+```python
+from owid import catalog
+
+# download catalog from `https://owid-catalog-private.nyc3.digitaloceanspaces.com/`
+catalog_frame = catalog.find('covid', 'owid')
+
+# download from our private catalog
+# needs keys for S3 access
+catalog_frame = catalog.find('energy', 'owid-private', uri='https://owid-catalog-private.nyc3.digitaloceanspaces.com/')
 ```
