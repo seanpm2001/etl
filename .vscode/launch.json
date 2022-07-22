@@ -14,6 +14,17 @@
             "justMyCode": true,
             "python": "/usr/bin/python",
 
+        },
+        {
+            "name": "grapher",
+            "type": "python",
+            "request": "launch",
+            "program": "/home/lucas/repos/etl/.venv/bin/etl",
+            "args": ["--force", "--only", "grapher://un/2022-07-11/un_wpp", "--grapher"],
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "python": "/usr/bin/python",
+
         }
     ]
 }

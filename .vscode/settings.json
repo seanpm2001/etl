@@ -1,0 +1,31 @@
+{
+    "sqltools.connections": [
+        {
+            "mysqlOptions": {
+                "authProtocol": "default"
+            },
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 3307,
+            "driver": "MySQL",
+            "name": "owid-grapher-local",
+            "group": "grapher",
+            "database": "grapher",
+            "username": "grapher",
+            "password": "grapher"
+        },
+        {
+            "mysqlOptions": {
+                "authProtocol": "default"
+            },
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 3333,
+            "driver": "MySQL",
+            "name": "owid-grapher-staging",
+            "database": "staging_grapher",
+            "username": "staging_grapher",
+            "password": "Az:cPvyNLGrshNQzcfCZKSwRH2E9!O"
+        }
+    ]
+}
