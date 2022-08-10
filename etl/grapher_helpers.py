@@ -183,16 +183,20 @@ def yield_long_table(
     assert isinstance(table, catalog.Table), "Table must be instance of `catalog.Table`"
     assert (
         table["meta"].dropna().map(lambda x: isinstance(x, catalog.VariableMeta)).all()
-    ), "Values in column `meta` must be either instances of `catalog.VariableMeta` or null"
+    ), (
+        "Values in column `meta` must be either instances of `catalog.VariableMeta` or"
+        " null"
+    )
 
     for var_name, t in table.groupby("variable"):
         t = t.rename(columns={"value": var_name})
 
         # extract metadata from column and make sure it is identical for all rows
         meta = t.pop("meta")
-        assert set(meta.map(id)) == {
-            id(meta.iloc[0])
-        }, f"Variable `{var_name}` must have same metadata objects in column `meta` for all rows"
+        assert set(meta.map(id)) == {id(meta.iloc[0])}, (
+            f"Variable `{var_name}` must have same metadata objects in column `meta`"
+            " for all rows"
+        )
         t[var_name].metadata = meta.iloc[0]
 
         if annot:
@@ -374,7 +378,10 @@ def adapt_dataset_metadata_for_grapher(
 
 
 def adapt_table_for_grapher(
-    table: catalog.Table, country_col: str = "country", year_col: str = "year"
+    table: catalog.Table,
+    country_col: str = "country",
+    year_col: str = "year",
+    index_cols: List[str] = ["entity_id", "year"],
 ) -> catalog.Table:
     """Adapt table (from a garden dataset) to be used in a grapher step.
 
@@ -386,6 +393,8 @@ def adapt_table_for_grapher(
         Name of country column in table.
     year_col : str
         Name of year column in table.
+    index_cols : List[str]
+        Name of the columns to use as index. By default uses ['entity_id', 'year'].
 
     Returns
     -------
@@ -397,7 +406,8 @@ def adapt_table_for_grapher(
     # Grapher needs a column entity id, that is constructed based on the unique entity names in the database.
     table["entity_id"] = country_to_entity_id(table[country_col], create_entities=True)
     table = table.drop(columns=[country_col]).rename(columns={year_col: "year"})
-    table = table.set_index(["entity_id", "year"])
+    # Set index
+    table = table.set_index(index_cols)
 
     # Ensure the default source of each column includes the description of the table (since that is the description that
     # will appear in grapher on the SOURCES tab).
