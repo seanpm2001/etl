@@ -496,15 +496,16 @@ def adapt_table_for_grapher(
 
 def _ensure_source_per_variable(table: catalog.Table) -> catalog.Table:
     for column in table.columns:
-        if len(table[column].metadata.sources) == 0:
+        variable_meta: catalog.VariableMeta = table[column].metadata
+        if len(variable_meta.sources) == 0:
             # Take the metadata sources from the dataset's metadata (after combining them into one).
-            table[column].metadata.sources = combine_metadata_sources(table.metadata.dataset).sources
-        if table[column].metadata.sources[0].description is None:
+            variable_meta.sources = combine_metadata_sources(table.metadata.dataset).sources
+        if variable_meta.sources[0].description is None:
             # Add the table description to the first source, so that it is displayed on the SOURCES tab.
-            table[column].metadata.sources[0].description = table.metadata.description
+            variable_meta.sources[0].description = table.metadata.description
         # Combine multiple sources into one.
-        if len(table[column].metadata.sources) > 1:
-            table[column].metadata.sources = combine_metadata_sources(table[column].metadata).sources
+        if len(variable_meta.sources) > 1:
+            variable_meta.sources = combine_metadata_sources(variable_meta).sources
     return table
 
 

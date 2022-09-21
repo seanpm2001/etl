@@ -26,6 +26,7 @@ def run(dest_dir: str) -> None:
     # table["population_projection"] = deepcopy(table["population"])
     # Add population table to dataset
     table = _adapt_table_for_grapher_patch(table)
+    __import__("ipdb").set_trace()
     dataset.add(table)
 
     # Add land area table to dataset
