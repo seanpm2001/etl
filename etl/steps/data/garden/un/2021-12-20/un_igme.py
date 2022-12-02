@@ -19,7 +19,6 @@ GAPMINDER_INFANT_MORTALITY_DATASET_PATH = DATA_DIR / "open_numbers/open_numbers/
 
 # naming conventions
 N = Names(__file__)
-N = Names("etl/steps/data/garden/un/2021-12-20/un_igme.py")
 
 
 def run(dest_dir: str) -> None:
@@ -30,6 +29,8 @@ def run(dest_dir: str) -> None:
     df = pd.DataFrame(tb_meadow).drop(columns=["index"])
     # adding source tag to all UN IGME rows prior to combination with Gapminder data
     df["source"] = "UN IGME"
+    # Duplicating the rows we will joing with gapminder so we also have the original values from just UN IGME
+    df = duplicate_child_infant_mortality(df)
     df_gap = get_gapminder_data(max_year=max(df["year"]))
     df_combine = pd.concat([df, df_gap])
 
@@ -64,17 +65,7 @@ def run(dest_dir: str) -> None:
     tb_garden.columns = tb_garden.columns.droplevel(level="unit")
 
     for col, unit in zip(tb_garden.columns, units):
-        tb_garden[col].metadata.unit = unit
-        # print(col)
-        # col_name = col.split(sep="__")
-        # Pulling out the relevant information from the column names for the metadata
-        # Metric is the central value or upper/lower bound
-        # metric = col_name[0]
-        # sex = col_name[1]
-        # age_group = col_name[2]
-        # unit = col_name[3]
-        # Creating table and variable level metadata
-        # tb_garden[col].metadata.title = f"{age_group} - {sex} - {metric}"
+        log.info(col)
         tb_garden[col].metadata.unit = unit
         if tb_garden[col].metadata.unit in ["deaths", "stillbirths"]:
             tb_garden[col] = tb_garden[col].astype("Int64").round(0)
@@ -85,14 +76,32 @@ def run(dest_dir: str) -> None:
             tb_garden[col].metadata.sources = [
                 Source(name="Gapminder (2020); United Nations Inter-agency Group for Child Mortality Estimation (2021)")
             ]
+            tb_garden[
+                col
+            ].metadata.description = "Share of children in the world dying in their first five years of life. This time-series is a combination of Gapminder and UN IGME. We use Gapminder data from 1800, until there is UN IGME data available, the availability of data from UN IGME varies between countries."
         if tb_garden[col].metadata.title == "Infant mortality rate - Both sexes - value":
             tb_garden[col].metadata.sources = [
                 Source(name="Gapminder (2015); United Nations Inter-agency Group for Child Mortality Estimation (2021)")
             ]
+            tb_garden[
+                col
+            ].metadata.description = "Share of children in the world dying in their first year of life. This time-series is a combination of Gapminder and UN IGME. We use Gapminder data from 1800, until there is UN IGME data available, the availability of data from UN IGME varies between countries."
     tb_garden = underscore_table(tb_garden)
     ds_garden.add(tb_garden)
     ds_garden.save()
     log.info("un_igme.end")
+
+
+def duplicate_child_infant_mortality(df: pd.DataFrame) -> pd.DataFrame:
+    """Duplicating the Child and Infant mortality rows so we can have one version which is 'original' and one which is a combination of Gapminder and UN IGME"""
+    df_copy = df.loc[
+        (df["indicator"].isin(["Under-five mortality rate", "Infant mortality rate"])) & (df["sex"] == "Total")
+    ]
+
+    df_copy["indicator"] = df_copy["indicator"].astype(str) + " (OMM: Gapminder, IGME)"
+    df_copy = df_copy.drop(columns=["lower_bound", "upper_bound"])
+    df = pd.concat([df, df_copy])
+    return df
 
 
 def combine_datasets(df: pd.DataFrame) -> pd.DataFrame:
@@ -108,9 +117,91 @@ def combine_datasets(df: pd.DataFrame) -> pd.DataFrame:
     keep_igme = pd.DataFrame(
         df[(df.duplicated(subset=["country", "indicator", "sex", "year"], keep=False)) & (df.source == "UN IGME")]
     )
+    assert keep_igme.indicator.isin(
+        ["Infant mortality rate (OMM: Gapminder, IGME)", "Under-five mortality rate (OMM: Gapminder, IGME)"]
+    ).all()
+
     df_clean = pd.concat([no_dups_df, keep_igme], ignore_index=True)
+    # Convert from per 1000 to %
+    df_clean.loc[
+        df_clean.indicator.isin(
+            ["Infant mortality rate (OMM: Gapminder, IGME)", "Under-five mortality rate (OMM: Gapminder, IGME)"]
+        ),
+        "value",
+    ] = (
+        df_clean.loc[
+            df_clean.indicator.isin(
+                ["Infant mortality rate (OMM: Gapminder, IGME)", "Under-five mortality rate (OMM: Gapminder, IGME)"]
+            ),
+            "value",
+        ]
+        / 10
+    )
+    df_clean.loc[
+        df_clean.indicator.isin(
+            ["Infant mortality rate (OMM: Gapminder, IGME)", "Under-five mortality rate (OMM: Gapminder, IGME)"]
+        ),
+        "lower_bound",
+    ] = (
+        df_clean.loc[
+            df_clean.indicator.isin(
+                ["Infant mortality rate (OMM: Gapminder, IGME)", "Under-five mortality rate (OMM: Gapminder, IGME)"]
+            ),
+            "lower_bound",
+        ]
+        / 10
+    )
+    df_clean.loc[
+        df_clean.indicator.isin(
+            ["Infant mortality rate (OMM: Gapminder, IGME)", "Under-five mortality rate (OMM: Gapminder, IGME)"]
+        ),
+        "upper_bound",
+    ] = (
+        df_clean.loc[
+            df_clean.indicator.isin(
+                ["Infant mortality rate (OMM: Gapminder, IGME)", "Under-five mortality rate (OMM: Gapminder, IGME)"]
+            ),
+            "upper_bound",
+        ]
+        / 10
+    )
+    df_clean.loc[
+        df_clean.indicator.isin(
+            ["Infant mortality rate (OMM: Gapminder, IGME)", "Under-five mortality rate (OMM: Gapminder, IGME)"]
+        ),
+        "unit",
+    ] = "deaths per 100 live births"
     assert df_clean[df_clean.groupby(["country", "indicator", "sex", "year"]).transform("size") > 1].shape[0] == 0
+    df_clean = calculate_surivivors(df_clean)
     return df_clean
+
+
+def calculate_surivivors(df: pd.DataFrame) -> pd.DataFrame:
+    # Calculating the long-run values of those surviving first 1 and 5 years of life
+    df_survive = df[
+        df.indicator.isin(
+            ["Infant mortality rate (OMM: Gapminder, IGME)", "Under-five mortality rate (OMM: Gapminder, IGME)"]
+        )
+    ]
+    df_survive["value"] = 100 - df_survive["value"]
+    df_survive["lower_bound"] = 100 - df_survive["lower_bound"]
+    df_survive["upper_bound"] = 100 - df_survive["upper_bound"]
+    df_survive.loc[
+        df_survive["indicator"] == "Infant mortality rate (OMM: Gapminder, IGME)", ["unit"]
+    ] = "share surviving first year of life"
+    df_survive.loc[
+        df_survive["indicator"] == "Under-five mortality rate (OMM: Gapminder, IGME", ["unit"]
+    ] = "share surviving first five years of life"
+
+    df_survive["indicator"] = df_survive["indicator"].replace(
+        {
+            "Under-five mortality rate (OMM: Gapminder, IGME)": "Share surviving first five years of life",
+            "Infant mortality rate (OMM: Gapminder, IGME)": "Share surviving first year of life",
+        }
+    )
+    df_survive["source"] = "OWID based on Gapminder and IGME"
+    df_out = pd.concat([df, df_survive])
+    return df_out
 
 
 def get_gapminder_data(max_year: int) -> pd.DataFrame:
@@ -121,7 +212,7 @@ def get_gapminder_data(max_year: int) -> pd.DataFrame:
     gapminder_child_mort = pd.DataFrame(
         gapminder_cm_df["child_mortality_0_5_year_olds_dying_per_1000_born"]
     ).reset_index()
-    gapminder_child_mort["indicator"] = "Under-five mortality rate"
+    gapminder_child_mort["indicator"] = "Under-five mortality rate (OMM: Gapminder, IGME)"
     gapminder_child_mort["sex"] = "Total"
     gapminder_child_mort["unit"] = "Deaths per 1000 live births"
     gapminder_child_mort = gapminder_child_mort.rename(
@@ -132,7 +223,7 @@ def get_gapminder_data(max_year: int) -> pd.DataFrame:
     # get infant mortality from open numbers
     gapminder_inf_m_df = catalog.Dataset(GAPMINDER_INFANT_MORTALITY_DATASET_PATH)
     gapminder_inf_mort = pd.DataFrame(gapminder_inf_m_df["infant_mortality_rate"]).reset_index()
-    gapminder_inf_mort["indicator"] = "Infant mortality rate"
+    gapminder_inf_mort["indicator"] = "Infant mortality rate (OMM: Gapminder, IGME)"
     gapminder_inf_mort["sex"] = "Total"
     gapminder_inf_mort["unit"] = "Deaths per 1000 live births"
     gapminder_inf_mort = gapminder_inf_mort.rename(columns={"area": "country", "infant_mortality_rate": "value"})
@@ -175,6 +266,11 @@ def harmonize_countries(df: pd.DataFrame) -> pd.DataFrame:
 def clean_and_format_data(df: pd.DataFrame) -> pd.DataFrame:
     """Cleaning up the values and dropping unused columns"""
     df = df.drop(columns=["regional_group"])
+    df = df[
+        ~df["indicator"].isin(
+            ["Progress towards SDG in neonatal mortality rate", "Progress towards SDG in under-five mortality rate"]
+        )
+    ]
     df["unit"] = df["unit"].replace(
         {
             "Number of deaths": "deaths",
