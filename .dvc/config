@@ -1,12 +1,15 @@
 [core]
     remote = public
 ['remote "public"']
-    url = s3://owid-catalog/snapshots
-    endpointurl = https://nyc3.digitaloceanspaces.com
-    acl = public-read
+    url = /Users/lars/Documents/owid/data/dvc/snapshots
+    #url = s3://owid-catalog/snapshots
+    #endpointurl = https://nyc3.digitaloceanspaces.com
+    #acl = public-read
 ['remote "public-read"']
+    url = /Users/lars/Documents/owid/data/dvc/snapshots
     # Use Cloudflare CDN for pulling public data (also users won't need AWS config)
-    url = https://catalog.ourworldindata.org/snapshots
+    #url = https://catalog.ourworldindata.org/snapshots
 ['remote "private"']
-    url = s3://owid-catalog/snapshots-private
-    endpointurl = https://nyc3.digitaloceanspaces.com
+    url = /Users/lars/Documents/owid/data/dvc/snapshots-private
+    #url = s3://owid-catalog/snapshots-private
+    #endpointurl = https://nyc3.digitaloceanspaces.com
