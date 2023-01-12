@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from typing import Iterator
 from unittest.mock import patch
 
+import pandas as pd
 from owid.catalog import Dataset
 
 from etl import paths
@@ -23,6 +24,7 @@ from etl.steps import (
     Step,
     compile_steps,
     filter_to_subgraph,
+    get_etag,
     select_dirty_steps,
     to_dependency_order,
 )
@@ -49,6 +51,23 @@ def test_data_step():
         _create_mock_py_file(step_name)
         DataStep(step_name, []).run()
         Dataset((paths.DATA_DIR / step_name).as_posix())
+
+
+def test_data_step_becomes_dirty_when_pandas_version_changes():
+    pandas_version = pd.__version__
+    try:
+        with temporary_step() as step_name:
+            _create_mock_py_file(step_name)
+            d = DataStep(step_name, [])
+            assert d.is_dirty()
+            d.run()
+            assert not d.is_dirty()
+
+            pd.__version__ += ".test"  # type: ignore
+            assert d.is_dirty()
+
+    finally:
+        pd.__version__ = pandas_version  # type: ignore
 
 
 @contextmanager
@@ -147,3 +166,8 @@ def test_select_dirty_steps():
         else:
             s.is_dirty = lambda: True  # type: ignore
     assert all([s.is_dirty() for s in select_dirty_steps(steps, 10)])  # type: ignore
+
+
+def test_get_etag():
+    etag = get_etag("https://raw.githubusercontent.com/owid/owid-grapher/master/README.md")
+    assert etag

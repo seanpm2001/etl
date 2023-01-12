@@ -7,7 +7,6 @@ from pywebio import input as pi
 from pywebio import output as po
 
 import etl
-from etl import config
 
 from . import utils
 
@@ -44,9 +43,11 @@ def app(run_checks: bool, dummy_data: bool) -> None:
         po.put_markdown(f.read())
 
     if run_checks:
-        _check_env()
+        po.put_markdown("""## Checking `.env` file...""")
+        utils._check_env()
 
-    _show_environment()
+    po.put_markdown("## Environment")
+    utils._show_environment()
 
     data = pi.input_group(
         "Options",
@@ -112,16 +113,18 @@ def app(run_checks: bool, dummy_data: bool) -> None:
 
 1. Test your step against your local database. If you have your grapher DB configured locally, your `.env` file should look similar to this:
 
-    ```
+    ```bash
     GRAPHER_USER_ID=59
     DB_USER=root
     DB_NAME=owid
     DB_HOST=127.0.0.1
+    DB_PORT=3306
+    DB_PASS=
     ```
 
     Then run the grapher step:
     ```
-    etl grapher/{form.namespace}/{form.version}/{form.short_name} --grapher {"--private" if form.is_private else ""}
+    poetry run etl grapher/{form.namespace}/{form.version}/{form.short_name} --grapher {"--private" if form.is_private else ""}
     ```
 
 2. When you feel confident, use `.env.staging` for staging which looks something like this:
@@ -144,7 +147,7 @@ def app(run_checks: bool, dummy_data: bool) -> None:
     After you run
 
     ```
-    ENV=.env.staging etl grapher/{form.namespace}/{form.version}/{form.short_name} --grapher {"--private" if form.is_private else ""}
+    ENV=.env.staging poetry run etl grapher/{form.namespace}/{form.version}/{form.short_name} --grapher {"--private" if form.is_private else ""}
     ```
 
     you should see it [in staging admin](https://staging.owid.cloud/admin/datasets).
@@ -152,12 +155,12 @@ def app(run_checks: bool, dummy_data: bool) -> None:
 3. Pushing to production grapher is **not yet automated**. After you get it reviewed and approved, you can use `.env.prod` file and run
 
     ```
-    ENV=.env.prod etl grapher/{form.namespace}/{form.version}/{form.short_name} --grapher {"--private" if form.is_private else ""}
+    ENV=.env.prod poetry run etl grapher/{form.namespace}/{form.version}/{form.short_name} --grapher {"--private" if form.is_private else ""}
     ```
 
 4. Check your dataset in [admin](https://owid.cloud/admin/datasets).
 
-
+5. If you are an internal OWID member and, because of this dataset update, you want to update charts in our Grapher DB, continue with `poetry run walkthrough charts`
 ## Generated files
 """
     )
@@ -166,32 +169,3 @@ def app(run_checks: bool, dummy_data: bool) -> None:
 
     if dag_content:
         utils.preview_dag(dag_content)
-
-
-def _check_env() -> None:
-    po.put_markdown("""## Checking `.env` file...""")
-
-    ok = True
-    for env_name in ("GRAPHER_USER_ID", "DB_USER", "DB_NAME", "DB_HOST"):
-        if getattr(config, env_name) is None:
-            ok = False
-            po.put_warning(
-                po.put_markdown(f"Environment variable `{env_name}` not found, do you have it in your `.env` file?")
-            )
-
-    if ok:
-        po.put_success(po.put_markdown("`.env` configured correctly"))
-
-
-def _show_environment() -> None:
-    po.put_markdown("## Environment")
-    po.put_info(
-        po.put_markdown(
-            f"""
-    * **GRAPHER_USER_ID**: `{config.GRAPHER_USER_ID}`
-    * **DB_USER**: `{config.DB_USER}`
-    * **DB_NAME**: `{config.DB_NAME}`
-    * **DB_HOST**: `{config.DB_HOST}`
-    """
-        )
-    )

@@ -1,0 +1,17 @@
+meta:
+  namespace: backport
+  short_name: dataset_5429_excess_mortality_estimates__the_economist__2022_values
+  name: Excess Mortality Estimates – The Economist (2022)
+  description: ''
+  source_name: Our World in Data catalog backport
+  url: https://owid.cloud/admin/datasets/5429
+  file_extension: feather
+  date_accessed: 2023-01-06 09:51:04.808508
+  is_public: false
+  version: latest
+  publication_date: latest
+wdir: ../../../data/snapshots/backport/latest
+outs:
+- md5: 84ba592e63ad764e722555888cd72d00
+  size: 3324402
+  path: dataset_5429_excess_mortality_estimates__the_economist__2022_values.feather
