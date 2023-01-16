@@ -1,0 +1,21 @@
+meta:
+  namespace: basemap
+  short_name: grapher_basemap
+  name: Basemap sourced from alexabruck/worldmap-sensitive
+  source_name: https://github.com/alexabruck
+  publication_year: 2017
+  publication_date: 2017-03-29
+  url: https://github.com/alexabruck/worldmap-sensitive
+  source_data_url: https://raw.githubusercontent.com/alexabruck/worldmap-sensitive/master/dist/world.topo.json
+  file_extension: topo.json
+  license_url: https://github.com/alexabruck/worldmap-sensitive/blob/master/README.md
+  license_name:
+  date_accessed: 2023-01-11
+  is_public: true
+  description: |
+
+wdir: ../../../data/snapshots/basemap/2023-01-11
+outs:
+- md5: 3f184c99e7d9677a85dbdb0e25ae064b
+  size: 237438
+  path: grapher_basemap.topo.json
