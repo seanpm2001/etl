@@ -16,6 +16,9 @@ N = Names(__file__)
 
 
 def run(dest_dir: str) -> None:
+    snap = Snapshot("basemap/2023-01-11/grapher_basemap.topo.json")
+
+    gdf = gpd.GeoDataFrame.from_file(snap.path)
 
     # create new dataset and reuse walden metadata
     ds = Dataset.create_empty(dest_dir, metadata=convert_snapshot_metadata(snap.metadata))
