@@ -172,6 +172,10 @@ steps:
   data://grapher/technology/2022/internet:
     - data://garden/technology/2022/internet
 
+  # Basemap
+  data://meadow/basemap/2023-01-11//grapher_basemap:
+    - snapshot://basemap/2023-01-11/grapher_basemap
+
   #
   # Aviation Safety Network - Aviation statistics (2022-10-14).
   #
