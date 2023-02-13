@@ -10,6 +10,8 @@ all_sources:
 
 dataset:
   title: # TO BE FILLED. Example: Testing Dataset Name (Institution, 2023)
+  description: 
+    This dataset ... blabla
   namespace: war
   short_name: bouthoul_carrere_1978
   version: 2023-01-18
