@@ -20,11 +20,11 @@ test-default: check-formatting lint check-typing unittest version-tracker
 	@echo '==> Installing packages'
 	git submodule update --init
 	poetry install
-	touch $@
+	touch .venv
 
 lint-default: .venv
 	@echo '==> Linting'
-	@poetry run flake8 $(SRC)
+	@poetry run ruff $(SRC)
 
 check-formatting-default: .venv
 	@echo '==> Checking formatting'
