@@ -8,3 +8,23 @@ steps:
   - data://garden/dummy/2020-01-01/dummy
   data://explorers/dummy/2020-01-01/dummy:
   - data://garden/dummy/2020-01-01/dummy
+  data://meadow/tourism/2023-05-04/unwto:
+  - snapshot://tourism/2023-05-04/unwto.xlsx
+  data://garden/tourism/2023-05-04/unwto:
+  - data://meadow/tourism/2023-05-04/unwto
+  data://grapher/tourism/2023-05-04/unwto:
+  - data://garden/tourism/2023-05-04/unwto
+  data://meadow/tourism/2023-05-05/unwto:
+  - snapshot://tourism/2023-05-04/unwto.xlsx
+  data://garden/tourism/2023-05-05/unwto:
+  - data://meadow/tourism/2023-05-05/unwto
+  data://meadow/tourism/2023-05-09/unwto_gdp:
+  - snapshot://tourism/2023-05-09/unwto_gdp.xlsx
+  data://garden/tourism/2023-05-09/unwto_gdp:
+  - data://meadow/tourism/2023-05-09/unwto_gdp
+  data://meadow/tourism/2023-05-09/unwto_environment:
+  - snapshot://tourism/2023-05-09/unwto_environment.xlsx
+  data://garden/tourism/2023-05-09/unwto_environment:
+  - data://meadow/tourism/2023-05-09/unwto_environment
+  data://meadow/tourism/2023-05-09/icct_co2:
+  - snapshot://tourism/2023-05-09/icct_co2.xlsx

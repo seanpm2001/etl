@@ -1,0 +1,14 @@
+dataset:
+  description: This is a dummy dataset, Veronika testing etl
+  licenses:
+  - url: https://raw.githubusercontent.com/owid/etl/master/walkthrough/license
+  sources:
+  - name: owid dummy data
+
+tables:
+  dummy_dataset:
+    variables:
+      dummy_variable:
+        title: dummy_variable
+        unit: dummy kilograms
+        short_unit: kg
