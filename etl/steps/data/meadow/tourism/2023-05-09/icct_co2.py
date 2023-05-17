@@ -176,8 +176,8 @@ def run(dest_dir: str) -> None:
     df_concat['value'] = df_concat['value'].astype(float)
     df_concat['country'] = df_concat['country'].astype(str)
     df_concat['indicator'] = df_concat['indicator'].astype(str)
-    df_concat = pd.pivot_table(df_concat, values='value', index=['year', 'country'], columns=['indicator'])
-
+    df_concat = pd.pivot_table(df_concat, values='value', index=['country', 'year'], columns=['indicator'])
+    df_concat.reset_index(inplace=True)
     # Create a new table and ensure all columns are snake-case.
     tb = Table(df_concat, short_name=paths.short_name, underscore=True)
 

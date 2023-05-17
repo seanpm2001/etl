@@ -1,0 +1,179 @@
+<html>
+    <head>
+        <meta charset="utf-8">
+        
+            <script src="lib/bindings/utils.js"></script>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/dist/vis-network.min.css" integrity="sha512-WgxfT5LWjfszlPHXRmBWHkV2eceiWTOBvrKCNbdgDYTHrT2AeLCGbF4sZlZw3UMN3WtL0tGUoIAKsu8mllg/XA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js" integrity="sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+            
+        
+<center>
+<h1></h1>
+</center>
+
+<!-- <link rel="stylesheet" href="../node_modules/vis/dist/vis.min.css" type="text/css" />
+<script type="text/javascript" src="../node_modules/vis/dist/vis.js"> </script>-->
+        <link
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+          integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6"
+          crossorigin="anonymous"
+        />
+        <script
+          src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js"
+          integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf"
+          crossorigin="anonymous"
+        ></script>
+
+
+        <center>
+          <h1></h1>
+        </center>
+        <style type="text/css">
+
+             #mynetwork {
+                 width: 100%;
+                 height: 600px;
+                 background-color: #ffffff;
+                 border: 1px solid lightgray;
+                 position: relative;
+                 float: left;
+             }
+
+             
+
+             
+             #config {
+                 float: left;
+                 width: 400px;
+                 height: 600px;
+             }
+             
+
+             
+        </style>
+    </head>
+
+
+    <body>
+        <div class="card" style="width: 100%">
+            
+            
+            <div id="mynetwork" class="card-body"></div>
+        </div>
+
+        
+        
+            <div id="config"></div>
+        
+
+        <script type="text/javascript">
+
+              // initialize global variables.
+              var edges;
+              var nodes;
+              var allNodes;
+              var allEdges;
+              var nodeColors;
+              var originalNodes;
+              var network;
+              var container;
+              var options, data;
+              var filter = {
+                  item : '',
+                  property : '',
+                  value : []
+              };
+
+              
+
+              
+
+              // This method is responsible for drawing the graph, returns the drawn network
+              function drawGraph() {
+                  var container = document.getElementById('mynetwork');
+
+                  
+
+                  // parsing and collecting nodes and edges from the python
+                  nodes = new vis.DataSet([{"color": "#280F2D", "id": "Finland", "label": "Finland", "shape": "dot", "size": 2, "title": "Finland"}, {"color": "#85F0C9", "id": "Sweden", "label": "Sweden", "shape": "dot", "size": 4, "title": "Sweden"}, {"color": "#338372", "id": "Estonia", "label": "Estonia", "shape": "dot", "size": 2, "title": "Estonia"}, {"color": "#13E214", "id": "Spain", "label": "Spain", "shape": "dot", "size": 15, "title": "Spain"}, {"color": "#8974AF", "id": "Germany", "label": "Germany", "shape": "dot", "size": 22, "title": "Germany"}, {"color": "#A3B722", "id": "Italy", "label": "Italy", "shape": "dot", "size": 20, "title": "Italy"}, {"color": "#CDBC3E", "id": "Russia", "label": "Russia", "shape": "dot", "size": 1, "title": "Russia"}, {"color": "#6D172C", "id": "T\u00fcrkiye", "label": "T\u00fcrkiye", "shape": "dot", "size": 4, "title": "T\u00fcrkiye"}, {"color": "#E2A0B0", "id": "Kazakhstan", "label": "Kazakhstan", "shape": "dot", "size": 1, "title": "Kazakhstan"}, {"color": "#6A5C9A", "id": "Ukraine", "label": "Ukraine", "shape": "dot", "size": 1, "title": "Ukraine"}, {"color": "#3D4568", "id": "China", "label": "China", "shape": "dot", "size": 3, "title": "China"}, {"color": "#368CAF", "id": "Flanders", "label": "Flanders", "shape": "dot", "size": 1, "title": "Flanders"}, {"color": "#3B2062", "id": "France", "label": "France", "shape": "dot", "size": 11, "title": "France"}, {"color": "#99B81C", "id": "Netherlands", "label": "Netherlands", "shape": "dot", "size": 5, "title": "Netherlands"}, {"color": "#833D7E", "id": "Norway", "label": "Norway", "shape": "dot", "size": 1, "title": "Norway"}, {"color": "#E04047", "id": "Denmark", "label": "Denmark", "shape": "dot", "size": 1, "title": "Denmark"}, {"color": "#36246E", "id": "United Kingdom", "label": "United Kingdom", "shape": "dot", "size": 8, "title": "United Kingdom"}, {"color": "#F33ABA", "id": "Slovenia", "label": "Slovenia", "shape": "dot", "size": 1, "title": "Slovenia"}, {"color": "#7B685F", "id": "Croatia", "label": "Croatia", "shape": "dot", "size": 5, "title": "Croatia"}, {"color": "#F4E965", "id": "Bosnia and Herzegovina", "label": "Bosnia and Herzegovina", "shape": "dot", "size": 2, "title": "Bosnia and Herzegovina"}, {"color": "#F2EDBA", "id": "Austria", "label": "Austria", "shape": "dot", "size": 8, "title": "Austria"}, {"color": "#0E03D0", "id": "Colombia", "label": "Colombia", "shape": "dot", "size": 1, "title": "Colombia"}, {"color": "#1C829F", "id": "United States", "label": "United States", "shape": "dot", "size": 6, "title": "United States"}, {"color": "#91CA93", "id": "Mexico", "label": "Mexico", "shape": "dot", "size": 1, "title": "Mexico"}, {"color": "#1CCDEE", "id": "Panama", "label": "Panama", "shape": "dot", "size": 2, "title": "Panama"}, {"color": "#619D36", "id": "Ecuador", "label": "Ecuador", "shape": "dot", "size": 1, "title": "Ecuador"}, {"color": "#5B2E4D", "id": "Malta", "label": "Malta", "shape": "dot", "size": 1, "title": "Malta"}, {"color": "#3E7407", "id": "Hungary", "label": "Hungary", "shape": "dot", "size": 1, "title": "Hungary"}, {"color": "#5F33E9", "id": "Romania", "label": "Romania", "shape": "dot", "size": 2, "title": "Romania"}, {"color": "#25BB21", "id": "Slovak Republic", "label": "Slovak Republic", "shape": "dot", "size": 2, "title": "Slovak Republic"}, {"color": "#79FC51", "id": "Latvia", "label": "Latvia", "shape": "dot", "size": 2, "title": "Latvia"}, {"color": "#FA49A1", "id": "Russian Federation", "label": "Russian Federation", "shape": "dot", "size": 2, "title": "Russian Federation"}, {"color": "#178341", "id": "Bulgaria", "label": "Bulgaria", "shape": "dot", "size": 3, "title": "Bulgaria"}, {"color": "#55CE09", "id": "Greece", "label": "Greece", "shape": "dot", "size": 6, "title": "Greece"}, {"color": "#CEEF60", "id": "Egypt", "label": "Egypt", "shape": "dot", "size": 1, "title": "Egypt"}, {"color": "#D27F3D", "id": "Poland", "label": "Poland", "shape": "dot", "size": 1, "title": "Poland"}, {"color": "#AF209F", "id": "Czech Republic", "label": "Czech Republic", "shape": "dot", "size": 2, "title": "Czech Republic"}, {"color": "#19B173", "id": "Costa Rica", "label": "Costa Rica", "shape": "dot", "size": 1, "title": "Costa Rica"}, {"color": "#55508D", "id": "Central America", "label": "Central America", "shape": "dot", "size": 1, "title": "Central America"}, {"color": "#38DE80", "id": "North America", "label": "North America", "shape": "dot", "size": 1, "title": "North America"}, {"color": "#0DC62E", "id": "Nicaragua", "label": "Nicaragua", "shape": "dot", "size": 1, "title": "Nicaragua"}, {"color": "#E31097", "id": "Belgium", "label": "Belgium", "shape": "dot", "size": 3, "title": "Belgium"}, {"color": "#EF741D", "id": "Lithuania", "label": "Lithuania", "shape": "dot", "size": 1, "title": "Lithuania"}, {"color": "#E6664C", "id": "Luxembourg", "label": "Luxembourg", "shape": "dot", "size": 1, "title": "Luxembourg"}, {"color": "#9A80D6", "id": "Australia", "label": "Australia", "shape": "dot", "size": 1, "title": "Australia"}, {"color": "#AC51A2", "id": "New Zealand", "label": "New Zealand", "shape": "dot", "size": 1, "title": "New Zealand"}, {"color": "#34F266", "id": "Indonesia", "label": "Indonesia", "shape": "dot", "size": 1, "title": "Indonesia"}, {"color": "#C3BF06", "id": "Former Yugoslav Republic of Macedonia", "label": "Former Yugoslav Republic of Macedonia", "shape": "dot", "size": 1, "title": "Former Yugoslav Republic of Macedonia"}, {"color": "#DDD18F", "id": "Switzerland", "label": "Switzerland", "shape": "dot", "size": 1, "title": "Switzerland"}, {"color": "#B2B4C0", "id": "Peru", "label": "Peru", "shape": "dot", "size": 1, "title": "Peru"}, {"color": "#6D678F", "id": "Chile", "label": "Chile", "shape": "dot", "size": 1, "title": "Chile"}, {"color": "#228C7E", "id": "Bolivia", "label": "Bolivia", "shape": "dot", "size": 1, "title": "Bolivia"}, {"color": "#B1D280", "id": "Fiji", "label": "Fiji", "shape": "dot", "size": 1, "title": "Fiji"}, {"color": "#70A30A", "id": "Great Britain", "label": "Great Britain", "shape": "dot", "size": 1, "title": "Great Britain"}, {"color": "#E71B55", "id": "Portugal", "label": "Portugal", "shape": "dot", "size": 2, "title": "Portugal"}, {"color": "#382023", "id": "Wallonia", "label": "Wallonia", "shape": "dot", "size": 1, "title": "Wallonia"}, {"color": "#76A2E2", "id": "Belarus", "label": "Belarus", "shape": "dot", "size": 1, "title": "Belarus"}, {"color": "#8826DE", "id": "Serbia", "label": "Serbia", "shape": "dot", "size": 1, "title": "Serbia"}, {"color": "#B5AA12", "id": "Europe not specified", "label": "Europe not specified", "shape": "dot", "size": 1, "title": "Europe not specified"}, {"color": "#145C33", "id": "Iraq", "label": "Iraq", "shape": "dot", "size": 1, "title": "Iraq"}, {"color": "#05E7A6", "id": "Georgia", "label": "Georgia", "shape": "dot", "size": 1, "title": "Georgia"}, {"color": "#A92AFD", "id": "Region of Brussels-Capital", "label": "Region of Brussels-Capital", "shape": "dot", "size": 1, "title": "Region of Brussels-Capital"}, {"color": "#99BC4D", "id": "Argentina", "label": "Argentina", "shape": "dot", "size": 1, "title": "Argentina"}, {"color": "#495AF3", "id": "Brazil", "label": "Brazil", "shape": "dot", "size": 1, "title": "Brazil"}]);
+                  edges = new vis.DataSet([{"color": "#85F0C9", "from": "Sweden", "to": "Finland", "value": 37.87234042553192}, {"color": "#338372", "from": "Estonia", "to": "Finland", "value": 34.04255319148936}, {"color": "#13E214", "from": "Spain", "to": "Finland", "value": 16.80851063829787}, {"color": "#8974AF", "from": "Germany", "to": "Finland", "value": 6.595744680851063}, {"color": "#A3B722", "from": "Italy", "to": "Finland", "value": 4.680851063829787}, {"color": "#6D172C", "from": "T\u00fcrkiye", "to": "Russia", "value": 36.652630456742294}, {"color": "#280F2D", "from": "Finland", "to": "Russia", "value": 19.81593911083824}, {"color": "#E2A0B0", "from": "Kazakhstan", "to": "Russia", "value": 17.1617868374108}, {"color": "#6A5C9A", "from": "Ukraine", "to": "Russia", "value": 13.709137575348887}, {"color": "#3D4568", "from": "China", "to": "Russia", "value": 12.660506019659778}, {"color": "#3B2062", "from": "France", "to": "Flanders", "value": 27.631881897437548}, {"color": "#99B81C", "from": "Netherlands", "to": "Flanders", "value": 27.19395307768525}, {"color": "#13E214", "from": "Spain", "to": "Flanders", "value": 18.600200649733782}, {"color": "#8974AF", "from": "Germany", "to": "Flanders", "value": 14.789826102459072}, {"color": "#A3B722", "from": "Italy", "to": "Flanders", "value": 11.784138272684338}, {"color": "#85F0C9", "from": "Sweden", "to": "Norway", "value": 35.72359843546285}, {"color": "#13E214", "from": "Spain", "to": "Norway", "value": 22.816166883963493}, {"color": "#E04047", "from": "Denmark", "to": "Norway", "value": 18.942074874278266}, {"color": "#36246E", "from": "United Kingdom", "to": "Norway", "value": 12.311417396163158}, {"color": "#8974AF", "from": "Germany", "to": "Norway", "value": 10.206742410132241}, {"color": "#7B685F", "from": "Croatia", "to": "Slovenia", "value": 65.77405857740585}, {"color": "#A3B722", "from": "Italy", "to": "Slovenia", "value": 12.092050209205022}, {"color": "#F4E965", "from": "Bosnia and Herzegovina", "to": "Slovenia", "value": 8.368200836820083}, {"color": "#F2EDBA", "from": "Austria", "to": "Slovenia", "value": 7.90794979079498}, {"color": "#8974AF", "from": "Germany", "to": "Slovenia", "value": 5.857740585774058}, {"color": "#1C829F", "from": "United States", "to": "Colombia", "value": 45.78702327885092}, {"color": "#91CA93", "from": "Mexico", "to": "Colombia", "value": 16.19691618152145}, {"color": "#13E214", "from": "Spain", "to": "Colombia", "value": 15.880187400027607}, {"color": "#1CCDEE", "from": "Panama", "to": "Colombia", "value": 12.864865742657866}, {"color": "#619D36", "from": "Ecuador", "to": "Colombia", "value": 9.271007396942164}, {"color": "#A3B722", "from": "Italy", "to": "Malta", "value": 47.46008836612033}, {"color": "#36246E", "from": "United Kingdom", "to": "Malta", "value": 28.00733870298454}, {"color": "#13E214", "from": "Spain", "to": "Malta", "value": 9.954290167217367}, {"color": "#8974AF", "from": "Germany", "to": "Malta", "value": 8.359558975025056}, {"color": "#3B2062", "from": "France", "to": "Malta", "value": 6.218723788652686}, {"color": "#5F33E9", "from": "Romania", "to": "Hungary", "value": 24.1840143921871}, {"color": "#8974AF", "from": "Germany", "to": "Hungary", "value": 24.10691338987407}, {"color": "#25BB21", "from": "Slovak Republic", "to": "Hungary", "value": 21.61398098175276}, {"color": "#F2EDBA", "from": "Austria", "to": "Hungary", "value": 18.015934207144692}, {"color": "#7B685F", "from": "Croatia", "to": "Hungary", "value": 12.079157029041378}, {"color": "#79FC51", "from": "Latvia", "to": "Estonia", "value": 19.22938389068983}, {"color": "#FA49A1", "from": "Russian Federation", "to": "Estonia", "value": 17.916533851363138}, {"color": "#85F0C9", "from": "Sweden", "to": "Estonia", "value": 14.353475150006116}, {"color": "#8974AF", "from": "Germany", "to": "Estonia", "value": 14.22557150675704}, {"color": "#6D172C", "from": "T\u00fcrkiye", "to": "Romania", "value": 42.55096657369965}, {"color": "#178341", "from": "Bulgaria", "to": "Romania", "value": 28.178183648328282}, {"color": "#55CE09", "from": "Greece", "to": "Romania", "value": 17.557814289935678}, {"color": "#A3B722", "from": "Italy", "to": "Romania", "value": 5.891734570374958}, {"color": "#CEEF60", "from": "Egypt", "to": "Romania", "value": 5.821300917661441}, {"color": "#8974AF", "from": "Germany", "to": "Poland", "value": 39.51524714091635}, {"color": "#A3B722", "from": "Italy", "to": "Poland", "value": 17.454294913902498}, {"color": "#36246E", "from": "United Kingdom", "to": "Poland", "value": 17.22227286381994}, {"color": "#55CE09", "from": "Greece", "to": "Poland", "value": 13.430136052567859}, {"color": "#AF209F", "from": "Czech Republic", "to": "Poland", "value": 12.37804902879335}, {"color": "#AF209F", "from": "Czech Republic", "to": "Slovak Republic", "value": 49.47285792666847}, {"color": "#7B685F", "from": "Croatia", "to": "Slovak Republic", "value": 16.329994605988087}, {"color": "#F2EDBA", "from": "Austria", "to": "Slovak Republic", "value": 13.566499826827894}, {"color": "#A3B722", "from": "Italy", "to": "Slovak Republic", "value": 11.374337862836107}, {"color": "#55508D", "from": "Central America", "to": "Costa Rica", "value": 34.23641800794048}, {"color": "#38DE80", "from": "North America", "to": "Costa Rica", "value": 23.699863122596565}, {"color": "#1CCDEE", "from": "Panama", "to": "Costa Rica", "value": 17.579050386080464}, {"color": "#1C829F", "from": "United States", "to": "Costa Rica", "value": 15.895753171597995}, {"color": "#0DC62E", "from": "Nicaragua", "to": "Costa Rica", "value": 8.588915311784499}, {"color": "#8974AF", "from": "Germany", "to": "Netherlands", "value": 30.813665621389667}, {"color": "#3B2062", "from": "France", "to": "Netherlands", "value": 22.214886945040433}, {"color": "#13E214", "from": "Spain", "to": "Netherlands", "value": 21.315398580623864}, {"color": "#E31097", "from": "Belgium", "to": "Netherlands", "value": 14.746657864334049}, {"color": "#A3B722", "from": "Italy", "to": "Netherlands", "value": 10.909390988611982}, {"color": "#EF741D", "from": "Lithuania", "to": "Latvia", "value": 26.454800663049934}, {"color": "#FA49A1", "from": "Russian Federation", "to": "Latvia", "value": 16.313512429001587}, {"color": "#85F0C9", "from": "Sweden", "to": "Latvia", "value": 15.966064072534222}, {"color": "#8974AF", "from": "Germany", "to": "Latvia", "value": 15.575781798610524}, {"color": "#3B2062", "from": "France", "to": "Italy", "value": 33.13787545976376}, {"color": "#13E214", "from": "Spain", "to": "Italy", "value": 21.73854133131496}, {"color": "#8974AF", "from": "Germany", "to": "Italy", "value": 20.698945194316646}, {"color": "#F2EDBA", "from": "Austria", "to": "Italy", "value": 13.695209807101772}, {"color": "#36246E", "from": "United Kingdom", "to": "Italy", "value": 10.729428207502867}, {"color": "#3B2062", "from": "France", "to": "Luxembourg", "value": 33.39653707531956}, {"color": "#8974AF", "from": "Germany", "to": "Luxembourg", "value": 25.25056010736744}, {"color": "#E31097", "from": "Belgium", "to": "Luxembourg", "value": 14.741038282120941}, {"color": "#A3B722", "from": "Italy", "to": "Luxembourg", "value": 14.340101522842641}, {"color": "#13E214", "from": "Spain", "to": "Luxembourg", "value": 12.271763012349421}, {"color": "#F4E965", "from": "Bosnia and Herzegovina", "to": "Croatia", "value": 32.89949385394071}, {"color": "#8974AF", "from": "Germany", "to": "Croatia", "value": 21.908893709327547}, {"color": "#A3B722", "from": "Italy", "to": "Croatia", "value": 17.20896601590745}, {"color": "#F2EDBA", "from": "Austria", "to": "Croatia", "value": 14.244396240057844}, {"color": "#AC51A2", "from": "New Zealand", "to": "Australia", "value": 28.18388501406497}, {"color": "#34F266", "from": "Indonesia", "to": "Australia", "value": 26.987399329505607}, {"color": "#1C829F", "from": "United States", "to": "Australia", "value": 20.338329929482484}, {"color": "#36246E", "from": "United Kingdom", "to": "Australia", "value": 12.781781048899848}, {"color": "#3D4568", "from": "China", "to": "Australia", "value": 11.708604678047088}, {"color": "#178341", "from": "Bulgaria", "to": "Greece", "value": 37.07687656878009}, {"color": "#C3BF06", "from": "Former Yugoslav Republic of Macedonia", "to": "Greece", "value": 22.017397585292276}, {"color": "#6D172C", "from": "T\u00fcrkiye", "to": "Greece", "value": 21.124710414733446}, {"color": "#8974AF", "from": "Germany", "to": "Greece", "value": 11.297162394202745}, {"color": "#A3B722", "from": "Italy", "to": "Greece", "value": 8.483853036991434}, {"color": "#8974AF", "from": "Germany", "to": "Switzerland", "value": 34.19465563980895}, {"color": "#A3B722", "from": "Italy", "to": "Switzerland", "value": 31.502810802275473}, {"color": "#3B2062", "from": "France", "to": "Switzerland", "value": 22.891737868487454}, {"color": "#F2EDBA", "from": "Austria", "to": "Switzerland", "value": 11.410795689428124}, {"color": "#F2EDBA", "from": "Austria", "to": "Germany", "value": 24.46677291920705}, {"color": "#13E214", "from": "Spain", "to": "Germany", "value": 22.93497914946661}, {"color": "#3B2062", "from": "France", "to": "Germany", "value": 13.503910182291994}, {"color": "#13E214", "from": "Spain", "to": "Austria", "value": 8.94031545074078}, {"color": "#55CE09", "from": "Greece", "to": "Austria", "value": 8.208391720917724}, {"color": "#6D678F", "from": "Chile", "to": "Peru", "value": 59.18415581281049}, {"color": "#1C829F", "from": "United States", "to": "Peru", "value": 13.562841708038054}, {"color": "#228C7E", "from": "Bolivia", "to": "Peru", "value": 12.161538618932665}, {"color": "#13E214", "from": "Spain", "to": "Peru", "value": 7.683406889427006}, {"color": "#0E03D0", "from": "Colombia", "to": "Peru", "value": 7.40805697079178}, {"color": "#1C829F", "from": "United States", "to": "New Zealand", "value": 10.722436355878138}, {"color": "#B1D280", "from": "Fiji", "to": "New Zealand", "value": 9.9395052860497}, {"color": "#3D4568", "from": "China", "to": "New Zealand", "value": 7.384924677638864}, {"color": "#36246E", "from": "United Kingdom", "to": "New Zealand", "value": 6.726196344652423}, {"color": "#13E214", "from": "Spain", "to": "France", "value": 37.38608014862645}, {"color": "#70A30A", "from": "Great Britain", "to": "France", "value": 15.600075572836241}, {"color": "#E31097", "from": "Belgium", "to": "France", "value": 12.180366233988565}, {"color": "#E71B55", "from": "Portugal", "to": "France", "value": 11.540639641255895}, {"color": "#3B2062", "from": "France", "to": "Wallonia", "value": 64.8354229068813}, {"color": "#13E214", "from": "Spain", "to": "Wallonia", "value": 11.458658574554727}, {"color": "#A3B722", "from": "Italy", "to": "Wallonia", "value": 10.329821601849028}, {"color": "#8974AF", "from": "Germany", "to": "Wallonia", "value": 6.7331011735586825}, {"color": "#99B81C", "from": "Netherlands", "to": "Wallonia", "value": 6.64299574315625}, {"color": "#36246E", "from": "United Kingdom", "to": "Lithuania", "value": 22.92260584943512}, {"color": "#D27F3D", "from": "Poland", "to": "Lithuania", "value": 18.783655369021226}, {"color": "#76A2E2", "from": "Belarus", "to": "Lithuania", "value": 15.415478830112978}, {"color": "#8974AF", "from": "Germany", "to": "Lithuania", "value": 15.415478830112978}, {"color": "#6D172C", "from": "T\u00fcrkiye", "to": "Bulgaria", "value": 35.269229606458964}, {"color": "#8826DE", "from": "Serbia", "to": "Bulgaria", "value": 11.200197835166506}, {"color": "#8974AF", "from": "Germany", "to": "Bulgaria", "value": 9.701339802560678}, {"color": "#B5AA12", "from": "Europe not specified", "to": "T\u00fcrkiye", "value": 25.493776822829307}, {"color": "#145C33", "from": "Iraq", "to": "T\u00fcrkiye", "value": 18.417140142521827}, {"color": "#05E7A6", "from": "Georgia", "to": "T\u00fcrkiye", "value": 17.869674154669013}, {"color": "#3B2062", "from": "France", "to": "Region of Brussels-Capital", "value": 50.586633654878085}, {"color": "#13E214", "from": "Spain", "to": "Region of Brussels-Capital", "value": 15.010770612192914}, {"color": "#8974AF", "from": "Germany", "to": "Region of Brussels-Capital", "value": 12.810436190366904}, {"color": "#A3B722", "from": "Italy", "to": "Region of Brussels-Capital", "value": 11.694192404855858}, {"color": "#99B81C", "from": "Netherlands", "to": "Region of Brussels-Capital", "value": 9.89796713770624}, {"color": "#E71B55", "from": "Portugal", "to": "Spain", "value": 25.23011152209298}, {"color": "#36246E", "from": "United Kingdom", "to": "Spain", "value": 15.932162142129078}, {"color": "#13E214", "from": "Spain", "to": "Belgium", "value": 15.947840566190838}, {"color": "#8974AF", "from": "Germany", "to": "Belgium", "value": 12.09479966979238}, {"color": "#A3B722", "from": "Italy", "to": "Belgium", "value": 11.33503187066487}, {"color": "#7B685F", "from": "Croatia", "to": "Czech Republic", "value": 19.460272679913775}, {"color": "#F2EDBA", "from": "Austria", "to": "Czech Republic", "value": 18.208031516332962}, {"color": "#A3B722", "from": "Italy", "to": "Czech Republic", "value": 15.923126623567496}, {"color": "#55CE09", "from": "Greece", "to": "Czech Republic", "value": 10.703849912508128}, {"color": "#99BC4D", "from": "Argentina", "to": "Chile", "value": 38.42206233204494}, {"color": "#1C829F", "from": "United States", "to": "Chile", "value": 11.362265267478241}, {"color": "#495AF3", "from": "Brazil", "to": "Chile", "value": 10.938632948061457}]);
+
+                  nodeColors = {};
+                  allNodes = nodes.get({ returnType: "Object" });
+                  for (nodeId in allNodes) {
+                    nodeColors[nodeId] = allNodes[nodeId].color;
+                  }
+                  allEdges = edges.get({ returnType: "Object" });
+                  // adding nodes and edges to the graph
+                  data = {nodes: nodes, edges: edges};
+
+                  var options = {
+    "configure": {
+        "enabled": true,
+        "filter": [
+            "nodes"
+        ]
+    },
+    "edges": {
+        "color": {
+            "inherit": true
+        },
+        "smooth": {
+            "enabled": true,
+            "type": "dynamic"
+        }
+    },
+    "interaction": {
+        "dragNodes": true,
+        "hideEdgesOnDrag": false,
+        "hideNodesOnDrag": false
+    },
+    "physics": {
+        "enabled": true,
+        "forceAtlas2Based": {
+            "avoidOverlap": 0,
+            "centralGravity": 0.1,
+            "damping": 0.2,
+            "gravitationalConstant": -600,
+            "springConstant": 0.02,
+            "springLength": 10
+        },
+        "solver": "forceAtlas2Based",
+        "stabilization": {
+            "enabled": true,
+            "fit": true,
+            "iterations": 1000,
+            "onlyDynamicEdges": false,
+            "updateInterval": 50
+        }
+    }
+};
+
+                  
+
+
+                  
+                  // if this network requires displaying the configure window,
+                  // put it in its div
+                  options.configure["container"] = document.getElementById("config");
+                  
+
+                  network = new vis.Network(container, data, options);
+
+                  
+
+                  
+
+                  
+
+
+                  
+
+                  return network;
+
+              }
+              drawGraph();
+        </script>
+    </body>
+</html>

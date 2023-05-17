@@ -63,8 +63,10 @@ def run(dest_dir: str) -> None:
     df.set_index(["country", "year", "implementation_type"], inplace=True)
     assert df.index.is_unique, f"Index is not unique'."
     df.reset_index(inplace=True)
+    df = pd.pivot_table(df, values='value', index=['country', 'year'], columns=['implementation_type'])
+    df.reset_index(inplace=True)
     # Create a new table and ensure all columns are snake-case.
-    tb = Table(df, short_name=paths.short_name, underscore=True)
+    tb = Table(df, short_name = paths.short_name, underscore = True)
 
     # Save outputs.
     # Create a new meadow dataset with the same metadata as the snapshot.

@@ -28,3 +28,19 @@ steps:
   - data://meadow/tourism/2023-05-09/unwto_environment
   data://meadow/tourism/2023-05-09/icct_co2:
   - snapshot://tourism/2023-05-09/icct_co2.xlsx
+  data://garden/tourism/2023-05-10/icct_co2:
+  - data://meadow/tourism/2023-05-09/icct_co2
+  data://garden/tourism/2023-05-10/unwto_environment:
+  - data://meadow/tourism/2023-05-09/unwto_environment
+  data://garden/tourism/2023-05-10/unwto_gdp:
+  - data://meadow/tourism/2023-05-09/unwto_gdp
+  data://meadow/tourism/2023-05-10/oecd_expenditure:
+  - snapshot://tourism/2023-05-10/oecd_expenditure.csv
+  data://meadow/tourism/2023-05-11/oecd_entr_empl:
+  - snapshot://tourism/2023-05-11/oecd_entr_empl.csv
+  data://garden/tourism/2023-05-11/oecd_entr_empl:
+  - data://meadow/tourism/2023-05-11/oecd_entr_empl
+  data://grapher/tourism/2023-05-11/uwnto:
+  - data://garden/tourism/2023-05-05/uwnto
+  data://grapher/tourism/2023-05-11/unwto:
+  - data://garden/tourism/2023-05-05/unwto

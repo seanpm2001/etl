@@ -1,4 +1,3 @@
-
 """Load a snapshot and create a meadow dataset."""
 
 import pandas as pd
@@ -140,7 +139,7 @@ def process_data(excel_object: pd.ExcelFile, year_range: tuple, matched_sheet_na
     df_concat.reset_index(inplace = True)
 
     assert df_concat.index.is_unique, "The index in the concatenated DataFrame is not unique."
-
+    print(df_concat)
     return df_concat
 
 
@@ -176,7 +175,6 @@ def run(dest_dir: str) -> None:
         "Employment",
         "Inbound Tourism-Expenditure",
         "Outbound Tourism-Expenditure"]
-
 
     log.info(f"Loading {len(sheet_names_to_load)} sheets from the Excel file:")
 
