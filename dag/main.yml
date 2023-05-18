@@ -341,7 +341,7 @@ steps:
   data://grapher/technology/2023-03-16/hcctad:
   - data://garden/technology/2023-03-16/hcctad
 
-# Happiness report
+  # Happiness report
   data://meadow/happiness/2023-03-20/happiness:
   - snapshot://happiness/2023-03-20/happiness.xls
   data://garden/happiness/2023-03-20/happiness:
@@ -402,6 +402,15 @@ steps:
   - data://meadow/wb/2023-05-12/women_business_law_additional
   data://grapher/wb/2023-05-12/women_business_law_additional:
   - data://garden/wb/2023-05-12/women_business_law_additional
+
+# Oil Spills
+  data://meadow/itopf/2023-05-18/oil_spills:
+  - snapshot://itopf/2023-05-18/oil_spills.pdf
+  data://garden/itopf/2023-05-18/oil_spills:
+  - data://meadow/itopf/2023-05-18/oil_spills
+  data://grapher/itopf/2023-05-18/oil_spills:
+  - data://garden/itopf/2023-05-18/oil_spills
+
 
 # Sub-dags to import
 include:

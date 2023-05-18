@@ -35,7 +35,11 @@ def run(dest_dir: str) -> None:
     df = geo.harmonize_countries(
         df=df, countries_file=paths.country_mapping_path, excluded_countries_file=paths.excluded_countries_path
     )
-
+    # replace '<NA>' with np.nan
+    df = df.replace('<NA>', np.nan)
+    # drop rows with np.nan values
+    df = df.dropna()
+    df.rename(columns = {df.columns[2]: 'SEEA_tables',df.columns[3]: 'TSA_tables', df.columns[4]: 'Total_tables'}, inplace = True)
     # Create a new table with the processed data.
     tb_garden = Table(df, like=tb_meadow)
 
