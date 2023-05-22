@@ -154,6 +154,7 @@ def run(dest_dir: str) -> None:
 
     # Calculate the 'bus_pers' column
     merged_df_concat_transf['bus_pers'] = merged_df_concat_transf['in_to_pu_bu_an_pr'] / merged_df_concat_transf['in_to_pu_pe']
+    merged_df_concat_transf['inb_outb'] = merged_df_concat_transf['in_to_ar_ov_vi_to'] / merged_df_concat_transf['ou_to_de_ov_vi_to']
 
     merged_df_concat_transf.reset_index(inplace = True)
 

@@ -1,0 +1,24 @@
+meta:
+  namespace: eurocontrol
+  short_name: eu_flights_2019_2021
+  name: Daily Traffic Variation (EUROCONTROL, 2022)
+  version: 2023-05-20
+  publication_year: 2023
+  publication_date: 2023-05-20
+  source_name: EUROCONTROL
+  source_published_by: European Organisation for the Safety of Air Navigation (EUROCONTROL)
+  url: https://www.eurocontrol.int/Economics/2022-DailyTrafficVariation-States.html
+  source_data_url:
+  file_extension: xlsx
+  license_url: https://www.eurocontrol.int/info/privacy-and-website-terms-use
+  license_name: European Organisation for the Safety of Air Navigation (EUROCONTROL)
+  date_accessed: 2023-05-20
+  is_public: true
+  description: |
+    The dataset provides comprehensive information on flights in Europe between 2019-2021. It includes columns such as "Entity," indicating the country, "Day" column identifies the specific day of the week on which the flights occurred in 2021. The "Day 2019" column denotes the equivalent day in the year 2019 for comparison purposes. The dataset also incorporates the "Day Previous Year" column, which represents the corresponding day in 2020.
+
+wdir: ../../../data/snapshots/eurocontrol/2023-05-20
+outs:
+- md5: 7869ba10abd77755742a127ab239b970
+  size: 1337136
+  path: eu_flights_2019_2021.xlsx

@@ -52,16 +52,64 @@ def run(dest_dir: str) -> None:
                 df_biggest_spills = extract_biggest_spills(textmj)
                 df_biggest_spills.reset_index(inplace = True)
 
-            elif page_number == 15: # extract cause data (not currently used; just in case we want it at some point)
+            elif page_number == 15: # extract cause and operations data
                 text_cause = extract_text_from_page(pdf, page_number)
                 df_above_7000, df_7_7000 = extract_cause_data(text_cause)
 
-    # Extract oil spilled and number of spills
-    nsp_quant = pd.merge(df_nspills, df_oil_spilled, on = 'Year', how = 'outer')
+
+    nsp_quant = pd.merge(df_nspills, df_oil_spilled, on = 'year', how = 'outer')  # Extract and merge oil spilled and number of spills
     nsp_quant['country'] = 'World'  # add World
 
+    # Causes
+    df_above_7000_cause_totals = df_above_7000[['Cause', df_above_7000.columns[-1]]].copy()
+    df_below_7000_cause_totals = df_7_7000[['Cause', df_7_7000.columns[-1]]].copy()
+
+    df_below_7000_cause_totals['year'] = 2023
+    df_above_7000_cause_totals['year'] = 2023
+    df_below_7000_cause_totals_pv = df_below_7000_cause_totals.pivot(index='year', columns='Cause', values='Total')
+    df_above_7000_cause_totals_pv = df_above_7000_cause_totals.pivot(index='year', columns='Cause', values='Total')
+    df_below_7000_cause_totals_pv = df_below_7000_cause_totals_pv.rename_axis(None, axis='columns')
+    df_below_7000_cause_totals_pv.reset_index(inplace=True)
+
+    df_above_7000_cause_totals_pv = df_above_7000_cause_totals_pv.rename_axis(None, axis='columns')
+    df_above_7000_cause_totals_pv.reset_index(inplace=True)
+    df_below_7000_cause_totals_pv['country'] = 'Small (7-700t)'
+    df_above_7000_cause_totals_pv['country'] = 'Large (>700t)'
+    merged_causes = pd.concat([df_above_7000_cause_totals_pv, df_below_7000_cause_totals_pv], axis=0)
+    for column in merged_causes.columns:
+        if column not in ['year', 'country']:
+            merged_causes.rename(columns={column: column + '_causes'}, inplace=True)
+
+
+    # Operations
+
+    df_above_7000[df_above_7000.columns[1:]] = df_above_7000[df_above_7000.columns[1:]].astype(int)
+    df_above_7000.loc['Operations Total'] = df_above_7000.sum(axis=0)
+    operations_ab_7000 = df_above_7000.iloc[[-1]]
+
+    df_7_7000[df_7_7000.columns[1:]] = df_7_7000[df_7_7000.columns[1:]].astype(int)
+    df_7_7000.loc['Operations Total'] = df_7_7000.sum(axis=0)
+    operations_bel_7000 = df_7_7000.iloc[[-1]]
+
+    operations_total = pd.concat([operations_bel_7000, operations_ab_7000])
+
+    operations_total.index = ['Small (7-700t)', 'Large (>700t)']
+    operations_total = operations_total.drop('Cause', axis=1)
+    operations_total.reset_index(inplace = True)
+
+    operations_total.rename(columns = {'index': 'country'},inplace=True)
+    operations_total['year'] = 2023
+    for column in operations_total.columns:
+        if column not in ['year', 'country']:
+            operations_total.rename(columns={column: column + '_ops'}, inplace=True)
+    merge_cause_op = pd.merge(merged_causes, operations_total, on = ['year', 'country'])
+    combined_df = pd.merge(nsp_quant,merge_cause_op, on = ['year', 'country'], how = 'outer')
+    combined_df.drop('Total_ops', axis = 1, inplace = True)
+    merge_biggest_spills = pd.merge(combined_df, df_biggest_spills, on = ['year', 'country'], how = 'outer')
+
+
     # Create a new table and ensure all columns are snake-case.
-    tb = Table(nsp_quant, short_name=paths.short_name, underscore=True)
+    tb = Table(merge_biggest_spills, short_name=paths.short_name, underscore=True)
 
     # Create a new meadow dataset with the same metadata as the snapshot.
     ds_meadow = create_dataset(dest_dir, tables=[tb], default_metadata=snap.metadata)
@@ -133,9 +181,9 @@ def extract_spill_quantity(text):
     oil_spilled = [int(oil.replace(',', '')) for oil in matches]
 
     # Create DataFrame with extracted oil spill data
-    df_oil_spills = pd.DataFrame({'Year': years, 'oil_spilled': oil_spilled})
-    df_oil_spills.sort_values('Year', inplace=True)
-    df_oil_spills.set_index('Year', inplace=True)
+    df_oil_spills = pd.DataFrame({'year': years, 'oil_spilled': oil_spilled})
+    df_oil_spills.sort_values('year', inplace=True)
+    df_oil_spills.set_index('year', inplace=True)
 
     return df_oil_spills
 
@@ -166,14 +214,14 @@ def extract_spill_number(text):
             data.append([year, value1, value2])
 
     # Create DataFrame with extracted number of spills data
-    df_spills = pd.DataFrame(data, columns=['Year', 'bel_700t', 'ab_700t'])
-    df_spills.sort_values('Year', inplace=True)
+    df_spills = pd.DataFrame(data, columns=['year', 'bel_700t', 'ab_700t'])
+    df_spills.sort_values('year', inplace=True)
 
     # Convert columns to integer type
     for column in df_spills.columns:
         df_spills[column] = df_spills[column].astype(int)
 
-    df_spills.set_index('Year', inplace = True)
+    df_spills.set_index('year', inplace = True)
 
     return df_spills
 
@@ -201,10 +249,10 @@ def extract_biggest_spills(text):
         locations.append(location)
         spill_sizes.append(spill_size)
 
-    df_biggest_spills = pd.DataFrame({'Year': years, 'country': locations, 'spill_size': spill_sizes})
-    df_biggest_spills['spill_size'] = df_biggest_spills['spill_size'].astype(int)
+    df_biggest_spills = pd.DataFrame({'year': years, 'country': locations, 'biggest_spills_size': spill_sizes})
+    df_biggest_spills['biggest_spills_size'] = df_biggest_spills['biggest_spills_size'].astype(int)
 
-    df_biggest_spills.set_index('Year', inplace=True)
+    df_biggest_spills.set_index('year', inplace=True)
 
     return df_biggest_spills
 
@@ -245,3 +293,4 @@ def extract_cause_data(text):
     df_7_7000 = pd.DataFrame(name_number_pairs_5, columns=["Cause", "Loading/Discharing", "Bunkering", "Other Operations", "Uknown", "Total"])
 
     return df_above_7000, df_7_7000
+

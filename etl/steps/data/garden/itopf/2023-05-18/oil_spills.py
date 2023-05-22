@@ -3,10 +3,9 @@
 import pandas as pd
 from owid.catalog import Dataset, Table
 from structlog import get_logger
-
+import numpy as np
 from etl.data_helpers import geo
 from etl.helpers import PathFinder, create_dataset
-import numpy as np
 
 log = get_logger()
 
@@ -46,6 +45,7 @@ def run(dest_dir: str) -> None:
         if column in ['bel_700t', 'ab_700t', 'oil_spilled']:
             # Calculate the decadal average
             decadal_averages = df.groupby(df['year'] // 10 * 10)[column].mean()
+            decadal_averages = decadal_averages.dropna()
 
             # Place the decadal average values into the corresponding decade columns
             decadal_column = 'decadal_' + str(column)
@@ -59,11 +59,21 @@ def run(dest_dir: str) -> None:
     assert df_decadal.index.is_unique, "Index is not unique."
     # Reset the index
     df_decadal.reset_index(inplace=True)
+    newnames = [name.replace('__', ' ') for name in df_decadal.columns]
+
+
+    df_decadal.columns = newnames
+    df_decadal['country'] = df_decadal['country'].astype(str)
+
+    # Update the 'country' column for specific rows
+    df_decadal.loc[df_decadal['country'] == 'La Coruna, Spain', 'country'] = df_decadal.loc[df_decadal['country'] == 'La Coruna, Spain', 'country'] + ', ' + df_decadal.loc[df_decadal['country'] == 'La Coruna, Spain', 'year'].astype(str)
+
+
 
     # Create a new table with the processed data.
     tb_garden = Table(df_decadal, short_name = 'oil_spills')
 
-    #
+
     # Save outputs.
     #
     # Create a new garden dataset with the same metadata as the meadow dataset.
