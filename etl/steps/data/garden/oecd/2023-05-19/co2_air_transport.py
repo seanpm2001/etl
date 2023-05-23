@@ -21,40 +21,15 @@ def run(dest_dir: str) -> None:
     # Load meadow dataset.
     ds_meadow: Dataset = paths.load_dependency("co2_air_transport")
     ds_tour: Dataset = paths.load_dependency("unwto")
-    ds_flights_2011_2021: Dataset = paths.load_dependency("eu_flights_2019_2021")
-    ds_flights_2022: Dataset = paths.load_dependency("eu_flights_2022")
-
 
     # Read table from meadow dataset.
     tb_meadow = ds_meadow["co2_air_transport"]
     tb_tour = ds_tour["unwto"]
 
-    tb_flights_19_21 = ds_flights_2011_2021['eu_flights_2019_2021']
-    tb_flights_22 =  ds_flights_2022['eu_flights_2022']
-
     # Create a dataframe with data from the table.
     df = pd.DataFrame(tb_meadow)
     df_tr = pd.DataFrame(tb_tour)
-    df_19_21 = pd.DataFrame(tb_flights_19_21)
-    df_22 = pd.DataFrame(tb_flights_22)
 
-    concatenated_flights = pd.concat([df_19_21, df_22])
-    date_column = pd.to_datetime(concatenated_flights['year'].astype(str) + '-' + concatenated_flights['month'].astype(str) + '-15')
-
-    # Assign the 'date' column to the DataFrame
-    concatenated_flights['date'] = date_column
-    concatenated_flights['days_since_2019'] = (concatenated_flights['date'] - pd.to_datetime('2019-01-01')).dt.days
-    concatenated_flights.drop(['month','year', 'date'], axis = 1, inplace = True)
-    concatenated_flights.rename(columns={'days_since_2019': 'year'}, inplace=True)
-    concatenated_flights = concatenated_flights.groupby(['year', 'country']).sum(numeric_only = True)
-    concatenated_flights.reset_index(inplace = True)
-
-    regions_ = ["European Union (27)"]
-
-    for region in regions_:
-         concatenated_flights = geo.add_region_aggregates(df = concatenated_flights, country_col='country', year_col='year', region=region)
-
-    europe_rows = concatenated_flights[concatenated_flights['country'] == 'European Union (27)']
     #
     # Process data.
     #
@@ -86,12 +61,12 @@ def run(dest_dir: str) -> None:
 
     for col in emissions_columns:
         pivot_table_ye[f'per_capita_{col}'] = pivot_table_ye[col] / pivot_table_ye['population']
-    just_inb_ratio = df_tr[['country', 'year','inb_outb']]
-    pivot_outb = pd.merge(pivot_table_ye, just_inb_ratio, on = ['year', 'country'])
-    pivot_outb = pd.merge(pivot_table_ye, just_inb_ratio, on = ['year', 'country'])
-    pivot_outb['int_inb_out'] = pivot_outb['TER_INT_a']*pivot_outb['inb_outb']
-    pivot_outb = pivot_outb.drop(['inb_outb'], axis = 1)
+    just_inb_ratio = df_tr[['country', 'year','inb_outb_tot']]
 
+    pivot_outb = pd.merge(pivot_table_ye, just_inb_ratio, on = ['year', 'country'])
+    pivot_outb = pd.merge(pivot_table_ye, just_inb_ratio, on = ['year', 'country'])
+    pivot_outb['int_inb_out'] = pivot_outb['TER_INT_a']*pivot_outb['inb_outb_tot']
+    pivot_outb = pivot_outb.drop(['inb_outb_tot'], axis = 1)
 
     df_mn = df[df['frequency'] == 'Monthly']
     df_mn = df_mn.drop(['frequency'], axis = 1)
@@ -137,37 +112,22 @@ def run(dest_dir: str) -> None:
          merge_df = geo.add_region_aggregates(df = merge_df, country_col = 'country', year_col = 'year', region = region)
 
     merge_df['TER_INT_m'] = merge_df['TER_INT_m'].replace(0, np.nan)
-    with_flights = pd.merge(merge_df,europe_rows, on = ['year', 'country'], how = 'outer')
-    with_flights.loc[with_flights['country'] == "European Union (27)", 'TER_INT_m_EU27'] = with_flights['TER_INT_m']
-    with_flights.rename(columns = {'flights': 'flights_eu'}, inplace = True)
-
-    with_flights = with_flights[with_flights['year'] != 2023]
-
-    month_names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-
-    def update_values(row):
-        country = row['country']
-        if country in regions_[:-1]:
-            return row
-        else:
-            row[month_names] = float('nan')  # Set values to NaN for month columns starting from the 3rd column
-            return row
+    merge_df = merge_df[merge_df['year'] != 2023]
 
     # Apply the function to each row using apply()
-    with_flights = with_flights.apply(update_values, axis=1)
-    with_flights.reset_index(inplace = True)
-    with_flights.drop('index', axis = 1, inplace = True)
-    # Melt the DataFrame to have months as rows
+    merge_df = merge_df.apply(update_values, axis=1)
+    merge_df.reset_index(inplace = True)
+    merge_df.drop('index', axis = 1, inplace = True)
 
-    month_names = ['country','year','January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-    df_extracted = with_flights[month_names].copy()
+    # Melt the DataFrame to have months as rows
+    df_extracted = merge_df[['country', 'year']+month_names].copy()
     df_melted = df_extracted.melt(id_vars=['country', 'year'], var_name='month', value_name='value')
     filtered_df = df_melted[df_melted['value'].notnull()]
     # Pivot the melted DataFrame to reshape it with countries as columns
     df_pivoted = filtered_df.pivot(index=['month','year'], columns=['country'], values='value')
     df_pivoted.reset_index(inplace = True)
     df_pivoted = df_pivoted.rename(columns={'month': 'country'})
-    mrg = pd.merge(df_pivoted,with_flights, on = ['country','year'], how = 'outer')
+    mrg = pd.merge(df_pivoted,merge_df, on = ['country','year'], how = 'outer')
 
     # Create a new table with the processed data.
     tb_garden = Table(mrg, short_name = 'co2_air_transport')
@@ -222,3 +182,17 @@ def ukraine_fill_war_for_reg_agg(df):
     merged_df[['year','ter_int_m_filled_ukraine']][country_mask]
 
     return merged_df
+
+
+
+def update_values(row):
+
+    regions_ = ["North America", "South America", "Europe",  "Africa",  "Asia", "Oceania"]
+    month_names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+    country = row['country']
+    if country in regions_:
+        return row
+    else:
+        row[month_names] = float('nan')  # Set values to NaN for month columns starting from the 3rd column
+        return row

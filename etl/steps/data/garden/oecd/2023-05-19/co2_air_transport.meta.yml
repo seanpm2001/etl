@@ -121,11 +121,3 @@ tables:
         title: Monthly CO2 Emissions from International Aviation
         unit: tonnes
         short_unit: t
-      flights_eu:
-        title: European Union Monthly Flights
-        unit: flights
-        short_unit: ''
-      ter_int_m_eu27:
-        title: European Union Monthly CO2 emissions from International Flights
-        unit: tonnes
-        short_unit: ''

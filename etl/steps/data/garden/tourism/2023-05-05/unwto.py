@@ -90,6 +90,7 @@ def run(dest_dir: str) -> None:
     # Add population data to the DataFrame
     merged_df_concat_transf = geo.add_population_to_dataframe(
         merged_df_concat, country_col="country", year_col="year", population_col="population")
+    merged_df_concat_transf.set_index(['country', 'year'], inplace=True)
 
     # Store the original column names
     original_columns = merged_df_concat_transf.columns.tolist()

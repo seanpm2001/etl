@@ -32,6 +32,10 @@ dataset:
 tables:
   unwto:
     variables:
+      index:
+        title: index
+        short_unit: ''
+        unit: ''
       in_to_ar_ov_vi_to:
         title: Inbound arrivals (tourists)
         unit: ''
@@ -320,7 +324,11 @@ tables:
         title: Business/Personal Ratio of Purpose of Travel
         unit: ''
         short_unit: ''
-      inb_outb:
-        title: Inbound/Outbound
+      inb_outb_tour:
+        title: Inbound/Outbound (tourists)
         short_unit: ''
-        unit: 'ratio'
+        unit: ''
+      inb_outb_tot:
+        title: Inbound/Outbound (total)
+        short_unit: ''
+        unit: ''

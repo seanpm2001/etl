@@ -33,24 +33,12 @@ steps:
   data://grapher/tourism/2023-05-09/unwto_gdp:
   - data://garden/tourism/2023-05-09/unwto_gdp
 
-  # EU flights (Eurcontrol)
-  data://meadow/eurocontrol/2023-05-20/eu_flights_2019_2021:
-  - snapshot://eurocontrol/2023-05-20/eu_flights_2019_2021.xlsx
-  data://meadow/eurocontrol/2023-05-20/eu_flights_2022:
-  - snapshot://eurocontrol/2023-05-20/eu_flights_2022.xlsx
-  data://garden/eurocontrol/2023-05-20/eu_flights_2019_2021:
-  - data://meadow/eurocontrol/2023-05-20/eu_flights_2019_2021
-  data://garden/eurocontrol/2023-05-20/eu_flights_2022:
-  - data://meadow/eurocontrol/2023-05-20/eu_flights_2022
-
 # CO2 emissions from air transport (OECD)
   data://meadow/oecd/2023-05-18/co2_air_transport:
   - snapshot://oecd/2023-05-18/co2_air_transport.csv
   data://garden/oecd/2023-05-19/co2_air_transport:
   - data://garden/tourism/2023-05-05/unwto
   - data://meadow/oecd/2023-05-18/co2_air_transport
-  - data://garden/eurocontrol/2023-05-20/eu_flights_2019_2021
-  - data://garden/eurocontrol/2023-05-20/eu_flights_2022
   data://grapher/oecd/2023-05-19/co2_air_transport:
   - data://garden/oecd/2023-05-19/co2_air_transport
 
