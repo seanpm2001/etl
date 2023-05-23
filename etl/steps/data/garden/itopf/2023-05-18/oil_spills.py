@@ -60,19 +60,14 @@ def run(dest_dir: str) -> None:
     # Reset the index
     df_decadal.reset_index(inplace=True)
     newnames = [name.replace('__', ' ') for name in df_decadal.columns]
-
-
     df_decadal.columns = newnames
     df_decadal['country'] = df_decadal['country'].astype(str)
 
     # Update the 'country' column for specific rows
     df_decadal.loc[df_decadal['country'] == 'La Coruna, Spain', 'country'] = df_decadal.loc[df_decadal['country'] == 'La Coruna, Spain', 'country'] + ', ' + df_decadal.loc[df_decadal['country'] == 'La Coruna, Spain', 'year'].astype(str)
 
-
-
     # Create a new table with the processed data.
     tb_garden = Table(df_decadal, short_name = 'oil_spills')
-
 
     # Save outputs.
     #

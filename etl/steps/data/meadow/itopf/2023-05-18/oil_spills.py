@@ -3,20 +3,16 @@
 import pandas as pd
 from owid.catalog import Table
 from structlog import get_logger
-
 from etl.helpers import PathFinder, create_dataset
 from etl.snapshot import Snapshot
-
-import urllib.request
 import pdfplumber
-from io import BytesIO
 import re
+
 # Initialize logger.
 log = get_logger()
 
 # Get paths and naming conventions for current step.
 paths = PathFinder(__file__)
-
 
 def run(dest_dir: str) -> None:
     log.info("oil_spills.start")
@@ -25,88 +21,119 @@ def run(dest_dir: str) -> None:
     #
     # Retrieve snapshot.
     snap: Snapshot = paths.load_dependency("oil_spills.pdf")
-
-    # Process data.
-    # Load data from url instead of snapshot bc it's a pdf file.
-    url_to_data = 'https://www.itopf.org/fileadmin/uploads/itopf/data/Photos/Statistics/Oil_Spill_Stats_brochure_2022.pdf'
-    pdf_content = extract_pdf_content(url_to_data)
-
-    with pdfplumber.open(BytesIO(pdf_content)) as pdf:
+    # Open and process the PDF fil
+    with pdfplumber.open(snap.path) as pdf:
         num_pages = len(pdf.pages)
         for page_number in range(num_pages):
             if page_number == 6:  # extract oil spilled
                 text = extract_text_from_page(pdf, page_number)
                 df_oil_spilled = extract_spill_quantity(text)
 
-                assert df_oil_spilled.index.is_unique
-                df_oil_spilled.reset_index(inplace = True)
+                assert df_oil_spilled.index.is_unique, f"Index is not unique' for quantity of oil spilled."
+                df_oil_spilled.reset_index(inplace=True)
 
             elif page_number == 5:  # extract number of spills
-                text_numnber = extract_text_from_page(pdf, page_number)
-                df_nspills = extract_spill_number(text_numnber)
-                assert df_nspills.index.is_unique
-                df_nspills.reset_index(inplace = True)
+                text_number = extract_text_from_page(pdf, page_number)
+                df_nspills = extract_spill_number(text_number)
+                assert df_nspills.index.is_unique,  f"Index is not unique for oil spills'."
+                df_nspills.reset_index(inplace=True)
 
-            elif page_number == 4: # extract biggest spills in history (not currently used; just in case we want it at some point)
-                textmj = extract_text_from_page(pdf, page_number)
-                df_biggest_spills = extract_biggest_spills(textmj)
+            elif page_number == 4:  # extract biggest spills in history (not currently used; just in case we want it at some point)
+                text_mj = extract_text_from_page(pdf, page_number)
+                df_biggest_spills = extract_biggest_spills(text_mj)
                 df_biggest_spills.reset_index(inplace = True)
 
-            elif page_number == 15: # extract cause and operations data
+            elif page_number == 15:  # extract cause and operations data
                 text_cause = extract_text_from_page(pdf, page_number)
                 df_above_7000, df_7_7000 = extract_cause_data(text_cause)
 
-
-    nsp_quant = pd.merge(df_nspills, df_oil_spilled, on = 'year', how = 'outer')  # Extract and merge oil spilled and number of spills
+    # Extract and merge oil spilled and number of spills
+    nsp_quant = pd.merge(df_nspills, df_oil_spilled, on = 'year', how = 'outer')
     nsp_quant['country'] = 'World'  # add World
 
-    # Causes
+    # Extract causes of oil spills
+    # Copy specific columns from two different DataFrames
     df_above_7000_cause_totals = df_above_7000[['Cause', df_above_7000.columns[-1]]].copy()
     df_below_7000_cause_totals = df_7_7000[['Cause', df_7_7000.columns[-1]]].copy()
 
-    df_below_7000_cause_totals['year'] = 2023
-    df_above_7000_cause_totals['year'] = 2023
+    # Assign a constant year value to the 'year' column for both DataFrames
+    df_below_7000_cause_totals['year'] = 2023;  df_above_7000_cause_totals['year'] = 2023
+
+    # Pivot both DataFrames to reshape them, setting 'year' as the index, 'Cause' as the columns, and 'Total' as the values
     df_below_7000_cause_totals_pv = df_below_7000_cause_totals.pivot(index='year', columns='Cause', values='Total')
     df_above_7000_cause_totals_pv = df_above_7000_cause_totals.pivot(index='year', columns='Cause', values='Total')
-    df_below_7000_cause_totals_pv = df_below_7000_cause_totals_pv.rename_axis(None, axis='columns')
-    df_below_7000_cause_totals_pv.reset_index(inplace=True)
 
+    # Remove column name for the index for both pivoted DataFrames
+    df_below_7000_cause_totals_pv = df_below_7000_cause_totals_pv.rename_axis(None, axis='columns')
     df_above_7000_cause_totals_pv = df_above_7000_cause_totals_pv.rename_axis(None, axis='columns')
-    df_above_7000_cause_totals_pv.reset_index(inplace=True)
-    df_below_7000_cause_totals_pv['country'] = 'Small (7-700t)'
-    df_above_7000_cause_totals_pv['country'] = 'Large (>700t)'
+
+    # Reset index for both pivoted DataFrames
+    df_below_7000_cause_totals_pv.reset_index(inplace = True);  df_above_7000_cause_totals_pv.reset_index(inplace = True)
+
+    # Assign a constant country value to the 'country' column for both pivoted DataFrames
+    df_below_7000_cause_totals_pv['country'] = 'Small (7-700t)'; df_above_7000_cause_totals_pv['country'] = 'Large (>700t)'
+
+    # Concatenate the two pivoted DataFrames along the row axis
     merged_causes = pd.concat([df_above_7000_cause_totals_pv, df_below_7000_cause_totals_pv], axis=0)
+
+    # For every column in the merged DataFrame that is not 'year' or 'country', rename the column by appending '_causes' to the existing column name
     for column in merged_causes.columns:
         if column not in ['year', 'country']:
             merged_causes.rename(columns={column: column + '_causes'}, inplace=True)
 
-
-    # Operations
-
+    # Extract operations during which spills occurred
+    # Convert columns from the second one onwards in df_above_7000 to integers
     df_above_7000[df_above_7000.columns[1:]] = df_above_7000[df_above_7000.columns[1:]].astype(int)
+
+    # Create a new row 'Operations Total' in df_above_7000 that is the sum of all rows
     df_above_7000.loc['Operations Total'] = df_above_7000.sum(axis=0)
+
+    # Extract the last row from df_above_7000
     operations_ab_7000 = df_above_7000.iloc[[-1]]
 
+    # Convert columns from the second one onwards in df_7_7000 to integers
     df_7_7000[df_7_7000.columns[1:]] = df_7_7000[df_7_7000.columns[1:]].astype(int)
+
+    # Create a new row 'Operations Total' in df_7_7000 that is the sum of all rows
     df_7_7000.loc['Operations Total'] = df_7_7000.sum(axis=0)
+
+    # Extract the last row from df_7_7000
     operations_bel_7000 = df_7_7000.iloc[[-1]]
 
+    # Concatenate the last rows from df_above_7000 and df_7_7000 into a new dataframe
     operations_total = pd.concat([operations_bel_7000, operations_ab_7000])
 
+    # Rename the index of operations_total to 'Small (7-700t)' and 'Large (>700t)'
     operations_total.index = ['Small (7-700t)', 'Large (>700t)']
+
+    # Drop the 'Cause' column from operations_total
     operations_total = operations_total.drop('Cause', axis=1)
+
+    # Reset the index of operations_total
     operations_total.reset_index(inplace = True)
 
+    # Rename the 'index' column to 'country'
     operations_total.rename(columns = {'index': 'country'},inplace=True)
+
+    # Add a new column 'year' to operations_total with a constant value 2023
     operations_total['year'] = 2023
+
+    # Append '_ops' to each column name that is not 'year' or 'country' in operations_total
     for column in operations_total.columns:
         if column not in ['year', 'country']:
             operations_total.rename(columns={column: column + '_ops'}, inplace=True)
-    merge_cause_op = pd.merge(merged_causes, operations_total, on = ['year', 'country'])
-    combined_df = pd.merge(nsp_quant,merge_cause_op, on = ['year', 'country'], how = 'outer')
-    combined_df.drop('Total_ops', axis = 1, inplace = True)
-    merge_biggest_spills = pd.merge(combined_df, df_biggest_spills, on = ['year', 'country'], how = 'outer')
 
+    # Merge operations_total with merged_causes on 'year' and 'country'
+    merge_cause_op = pd.merge(merged_causes, operations_total, on = ['year', 'country'])
+
+    # Merge nsp_quant with merge_cause_op on 'year' and 'country' into a new dataframe 'combined_df'
+    combined_df = pd.merge(nsp_quant,merge_cause_op, on = ['year', 'country'], how = 'outer')
+
+    # Drop the 'Total_ops' column from combined_df
+    combined_df.drop('Total_ops', axis = 1, inplace = True)
+
+    # Merge combined_df with df_biggest_spills on 'year' and 'country'
+    merge_biggest_spills = pd.merge(combined_df, df_biggest_spills, on = ['year', 'country'], how = 'outer')
 
     # Create a new table and ensure all columns are snake-case.
     tb = Table(merge_biggest_spills, short_name=paths.short_name, underscore=True)
@@ -118,7 +145,6 @@ def run(dest_dir: str) -> None:
     ds_meadow.save()
 
     log.info("oil_spills.end")
-
 
 
 

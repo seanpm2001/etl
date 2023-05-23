@@ -17,37 +17,43 @@ paths = PathFinder(__file__)
 def run(dest_dir: str) -> None:
     log.info("co2_air_transport.start")
 
-    #
     # Load inputs.
-    #
-    # Retrieve snapshot.
+    # Load the snapshot
     snap: Snapshot = paths.load_dependency("co2_air_transport.csv")
 
-    # Load data from snapshot.
+    # Load data from the snapshot into a pandas DataFrame
     df = pd.read_csv(snap.path, low_memory=False)
-    cos_to_use = ['Country', 'FLIGHT' ,'Frequency', 'SOURCE', 'TIME', 'Value']
-    cos_to_name = ['country', 'flight_type' ,'frequency', 'emission_source', 'year', 'value']
+
+    # Specify columns to use and their new names
+    cos_to_use = ['Country', 'FLIGHT', 'Frequency', 'SOURCE', 'TIME', 'Value']
+    cos_to_name = ['country', 'flight_type', 'frequency', 'emission_source', 'year', 'value']
+
+    # Slice the DataFrame to keep only the columns of interest
     df = df[cos_to_use]
+
+    # Rename the columns in the DataFrame
     df = df.rename(columns=dict(zip(df.columns, cos_to_name)))
 
-    df['year'] = pd.to_datetime(df['year'])  # Convert the TIME column to datetime
-    df['Month'] = df['year'].dt.month  # Extract month and create a new column
-    df['Year'] = df['year'].dt.year  # Extract month and create a new column
-    df.drop(['year'], axis=1, inplace= True)
+    # Convert the 'year' column to datetime
+    df['year'] = pd.to_datetime(df['year'])
 
-        #
+    # Extract the month and year from 'year' column and create new columns
+    df['Month'] = df['year'].dt.month
+    df['Year'] = df['year'].dt.year
+
+    # Drop the original 'year' column
+    df.drop(['year'], axis=1, inplace=True)
+
     # Process data.
-    #
-    # Create a new table and ensure all columns are snake-case.
+    # Create a new table and ensure all column names are in snake-case format
     tb = Table(df, short_name=paths.short_name, underscore=True)
 
-    #
     # Save outputs.
-    #
-    # Create a new meadow dataset with the same metadata as the snapshot.
+    # Create a new dataset with the same metadata as the snapshot
     ds_meadow = create_dataset(dest_dir, tables=[tb], default_metadata=snap.metadata)
 
-    # Save changes in the new garden dataset.
+    # Save changes in the new dataset
     ds_meadow.save()
 
+    # End logging
     log.info("co2_air_transport.end")

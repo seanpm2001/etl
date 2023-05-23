@@ -171,7 +171,6 @@ def run(dest_dir: str) -> None:
 
     # Create a new table with the processed data.
     tb_garden = Table(mrg, short_name = 'co2_air_transport')
-
     #
     # Save outputs.
     #

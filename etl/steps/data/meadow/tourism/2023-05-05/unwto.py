@@ -58,15 +58,15 @@ def process_sheet(excel_object: pd.ExcelFile, sheet_name: str, year_range: tuple
 
     # Drop additional columns
     columns_to_drop = ['Units', 'Notes', 'Series']
-    df = df.drop(columns=[col for col in columns_to_drop if col in df.columns])
+    df = df.drop(columns = [col for col in columns_to_drop if col in df.columns])
 
     # More column dropping
     df = df.drop(df.columns[1], axis=1)
     df = df.drop(df.columns[-1], axis=1)
 
     # Remove rows and columns with all NaN values
-    df.dropna(how='all', axis=1, inplace=True)
-    df.dropna(how='all', axis=0, inplace=True)
+    df.dropna(how = 'all', axis=1, inplace=True)
+    df.dropna(how = 'all', axis=0, inplace=True)
 
     # Rename the 'Basic data and indicators' column to 'country'
     df = df.rename(columns={'Basic data and indicators': 'country'})
@@ -89,16 +89,14 @@ def process_sheet(excel_object: pd.ExcelFile, sheet_name: str, year_range: tuple
 
     # Combine remaining columns to create the 'indicator' column
     df['indicator'] = df.drop(columns=['country', 'value', 'year']).apply(lambda x: ','.join(x.dropna().astype(str)), axis=1)
-    df.dropna(subset=['value'], inplace=True)
+    df.dropna(subset = ['value'], inplace=True)
 
     # Keep only the necessary columns
     cols_to_keep = ['country', 'year', 'value', 'indicator']
     df = df[cols_to_keep]
 
     # Drop rows with missing 'value' and replace '..' with NaN
-    df.dropna(subset=['value'], inplace=True)
-
-
+    df.dropna(subset = ['value'], inplace = True)
     df['value'] = df['value'].replace('..', np.nan)
 
     # Add the sheet name to the 'indicator' column
@@ -108,7 +106,6 @@ def process_sheet(excel_object: pd.ExcelFile, sheet_name: str, year_range: tuple
     df.set_index(['country', 'year', 'indicator'], inplace=True)
 
     assert df.index.is_unique, f"Index is not unique in sheet '{sheet_name}'." # Added assert statement to check index is unique
-
     return df
 
 def process_data(excel_object: pd.ExcelFile, year_range: tuple, matched_sheet_names: list) -> pd.DataFrame:
@@ -139,16 +136,13 @@ def process_data(excel_object: pd.ExcelFile, year_range: tuple, matched_sheet_na
     df_concat.reset_index(inplace = True)
 
     assert df_concat.index.is_unique, "The index in the concatenated DataFrame is not unique."
-    print(df_concat)
     return df_concat
 
 
 def run(dest_dir: str) -> None:
     log.info("unwto.start")
-
-    # Ask the user for the year range
-    end_year = int(input("Enter the most recent year: "))
-    year_range = (1995, end_year)
+    # Year range
+    year_range = (1995, 2022)
 
     # Load inputs.
     snap: Snapshot = paths.load_dependency("unwto.xlsx")
@@ -192,7 +186,6 @@ def run(dest_dir: str) -> None:
             matched_sheet_names.append(best_match)
 
     # Check that all required sheets were matched
-
     print("Matched sheet names:")
     for name in matched_sheet_names:
         print(f"- {name}")
