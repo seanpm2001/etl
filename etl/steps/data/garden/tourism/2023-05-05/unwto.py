@@ -88,7 +88,7 @@ def run(dest_dir: str) -> None:
 
     # Add population data to the DataFrame
     merged_df_concat_transf = geo.add_population_to_dataframe(
-        merged_df_concat, country_col="country", year_col="year", population_col="population")
+        merged_df_concat, country_col = "country", year_col = "year", population_col = "population")
     merged_df_concat_transf.set_index(['country', 'year'], inplace=True)
 
     # Store the original column names
@@ -121,10 +121,10 @@ def run(dest_dir: str) -> None:
     # Calculate the Business/Personal Tourism column
     merged_df_concat_transf['bus_pers'] = merged_df_concat_transf['in_to_pu_bu_an_pr'] / merged_df_concat_transf['in_to_pu_pe']
 
-    # Calculate the Inbound/Outbound Ration (tourists) column
+    # Calculate the Inbound/Outbound Ratio (tourists) column
     merged_df_concat_transf['inb_outb_tour'] = merged_df_concat_transf['in_to_ar_ov_vi_to'] / merged_df_concat_transf['ou_to_de_ov_vi_to']
 
-    # Calculate the Inbound/Outbound Ration (total) column
+    # Calculate the Inbound/Outbound Ratio (total) column
     merged_df_concat_transf['inb_outb_tot'] = merged_df_concat_transf['in_to_ar_to_ar'] / merged_df_concat_transf['ou_to_de_to_de']
 
     merged_df_concat_transf.reset_index(inplace = True) # reset index

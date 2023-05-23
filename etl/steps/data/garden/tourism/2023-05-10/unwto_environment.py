@@ -40,15 +40,18 @@ def run(dest_dir: str) -> None:
     df = df.replace('<NA>', np.nan)
     # drop rows with np.nan values
     df = df.dropna()
-    df.rename(columns = {df.columns[2]: 'SEEA_tables',df.columns[3]: 'TSA_tables', df.columns[4]: 'Total_tables'}, inplace = True)
+    df.rename(columns = {df.columns[2]: 'seea_tables',df.columns[3]: 'tsa_tables', df.columns[4]: 'total_tables'}, inplace = True)
     # Create a new table with the processed data.
-    tb_garden = Table(df, like=tb_meadow)
+    df.reset_index(inplace = True )
+    df.drop('index', axis = 1, inplace = True)
+
+    tb_garden = Table(df, short_name = 'unwto_environment')
 
     #
     # Save outputs.
     #
     # Create a new garden dataset with the same metadata as the meadow dataset.
-    ds_garden = create_dataset(dest_dir, tables=[tb_garden], default_metadata=ds_meadow.metadata)
+    ds_garden = create_dataset(dest_dir, tables=[tb_garden], default_metadata = None)
 
     # Save changes in the new garden dataset.
     ds_garden.save()

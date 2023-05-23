@@ -1,35 +1,42 @@
-# (Inherited from meadow, remove if not different.)
-all_sources:
-  - source_testing: &source-testing
-      name: # Example: Testing Short Citation
-      published_by: # (if different to short citation). Example: Testing Full Citation
-      url: # Example: https://url_of_testing_source.com/
-      date_accessed: # Example: 2023-01-01
-      publication_date: # Example: 2023-01-01
-      publication_year: # (if publication_date is not given). Example: 2023
-      # description: Source description.
-
-# (Inherited from meadow, remove if not different.)
 dataset:
-  title: # Example: Testing Dataset Name (Institution, 2023)
-  # description: Dataset description.
+  title: UNWTO Environmental and Economic Aspects of Tourism
+  description: Implementation of standards accounting tools to monitor the economic
+    and environmental aspects of tourism sustainability (indicator 12.b.1). Indicator
+    12.b.1 shows the preparedness of countries to “develop and implement tools to
+    monitor sustainable development impacts for sustainable tourism” called for in
+    target 12.b under Goal 12 on Sustainable Consumption and Production. More specifically,
+    it tracks the implementation of the most relevant Tourism Satellite Account (TSA)
+    and System of Environmental Economic Accounting (SEEA) tables.
   licenses:
-    - name: # Example: Testing License Name
-      url: # Example: https://url_of_testing_source.com/license
+  - name: Creative Commons BY 4.0
+    url: https://www.unwto.org/copyright
   sources:
-    - *source-testing
-
+  - name: UNWTO and OECD
+    description: |-
+      The United Nations World Tourism Organization (UNWTO) collects data from countries through
+      annual questionnaires that follow the International Recommendations for Tourism Statistics (IRTS 2008)
+      standard, a framework approved by the United Nations.
+    url: https://www.unwto.org/tourism-statistics/economic-contribution-SDG
+    source_data_url: https://webunwto.s3.eu-west-1.amazonaws.com/s3fs-public/2023-03/indicator_8.9.1_march2023_update.xlsx
+    date_accessed: '2023-05-09'
+    publication_date: '2023-03-15'
+    publication_year: 2023
+    published_by: World Tourism Organization, 2023
 tables:
   unwto_environment:
-    # (Inherited from meadow, remove if not different.)
     variables:
-      # testing_variable:
-      #   title: Testing variable title
-      #   unit: arbitrary units
-      #   short_unit: au
-      #   description: Full description of testing variable.
-      #   sources:
-      #     - *source-testing
-      #   display:
-      #     entityAnnotationsMap: Test annotation
-      #     numDecimalPlaces: 0
+      seea_tables:
+        title: Implementation of standard accounting tools to monitor the economic
+          and environmental aspects of tourism (SEEA tables)
+        short_unit: ''
+        unit: ''
+      tsa_tables:
+        title: Implementation of standard accounting tools to monitor the economic
+          and environmental aspects of tourism (Tourism Satellite Account tables)
+        short_unit: ''
+        unit: ''
+      total_tables:
+        title: Implementation of standard accounting tools to monitor the economic
+          and environmental aspects of tourism (number of tables)
+        short_unit: ''
+        unit: ''
