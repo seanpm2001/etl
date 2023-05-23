@@ -5,6 +5,7 @@
 
 import cmd
 import json
+import re
 from collections import defaultdict
 from pathlib import Path
 from typing import DefaultDict, Dict, List, Optional, Set, cast
@@ -14,7 +15,7 @@ import pandas as pd
 from owid.catalog import Dataset
 from rapidfuzz import process
 
-from etl.paths import REFERENCE_DATASET
+from etl.paths import LATEST_REGIONS_DATASET_PATH, LATEST_REGIONS_YML
 
 
 @click.command()
@@ -23,10 +24,9 @@ from etl.paths import REFERENCE_DATASET
 @click.argument("output_file")
 @click.argument("institution", required=False)
 def harmonize(data_file: str, column: str, output_file: str, institution: Optional[str] = None) -> None:
-    """
-    Given a data file in feather or CSV format, and the name of the column representing
-    country or region names, interactively generate a JSON mapping from the given names
-    to OWID's canonical names.
+    """Given a DATA_FILE in feather or CSV format, and the name of the COLUMN representing
+    country or region names, interactively generate the JSON mapping OUTPUT_FILE from the given names
+    to OWID's canonical names. Optionally, can use INSTITUTION to append "(institution)" to countries.
 
     When a name is ambiguous, you can use:
 
@@ -113,8 +113,8 @@ def interactive_harmonize(
             mapping[region] = name
 
             if picker.save_alias:
-                # update the reference dataset to include this alias
-                save_alias(name, region)
+                # update the regions dataset to include this alias
+                save_alias_to_regions_yaml(name, region)
                 print(f'Saved alias: "{region}" -> "{name}"')
         else:
             n_skipped += 1
@@ -133,15 +133,18 @@ class CountryRegionMapper:
     valid_names: Set[str]
 
     def __init__(self) -> None:
-        rc = Dataset(REFERENCE_DATASET)["countries_regions"]
+        ds_regions = Dataset(LATEST_REGIONS_DATASET_PATH)
+        rc_df = ds_regions["definitions"]
+        aliases_s = ds_regions["aliases"]["alias"]
         aliases = {}
         valid_names = set()
-        for _, row in rc.iterrows():
-            name = row["name"]
+        for row in rc_df.itertuples():
+            name = row.name  # type: ignore
+            code = row.Index  # type: ignore
             valid_names.add(name)
-            aliases[row["name"].lower()] = name
-            if not pd.isnull(row.aliases):
-                for alias in json.loads(row.aliases):
+            aliases[name.lower()] = name
+            if code in aliases_s.index:
+                for alias in aliases_s.loc[[code]]:
                     aliases[alias.lower()] = name
 
         self.aliases = aliases
@@ -226,7 +229,7 @@ class GeoPickerCmd(cmd.Cmd):
                 self.save_alias = input_bool("Save this alias")
             else:
                 # it's a manual entry that does not correspond to any known country
-                print(f"Using custom entry '{choice}' that does not match a country/region from the reference set")
+                print(f"Using custom entry '{choice}' that does not match a country/region from the regions set")
                 self.match = choice
 
         return True
@@ -262,24 +265,41 @@ def input_bool(query: str, default: str = "y") -> bool:
     return (c.lower() or default) == "y"
 
 
-def save_alias(name: str, alias: str) -> None:
+def save_alias_to_regions_yaml(name: str, alias: str) -> None:
     """
-    Update the reference country/region dataset to include this alias.
+    Save alias to regions.yml definitions. It doesn't modify original formatting of the file, but assumes
+    that `alias` is always the last element in the region block.
     """
-    # load it
-    ref = Dataset(REFERENCE_DATASET)
-    rc = ref["countries_regions"]
+    with open(LATEST_REGIONS_YML, "r") as f:
+        yaml_content = f.read()
 
-    # get the existing aliases for this country/region
-    aliases_json = rc.loc[rc.name == name, "aliases"].iloc[0]
-    aliases = set(json.loads(aliases_json if not pd.isnull(aliases_json) else "[]"))
+    with open(LATEST_REGIONS_YML, "w") as f:
+        f.write(_add_alias_to_regions(yaml_content, name, alias))
 
-    # add our new one
-    aliases.add(alias)
 
-    # pack up and save
-    rc.loc[rc.name == name, "aliases"] = json.dumps(sorted(aliases))
-    ref.add(rc, formats=["csv"])
+def _add_alias_to_regions(yaml_content, target_name, new_alias):
+    # match block that contains target name
+    pattern = f'name: "{re.escape(target_name)}"(?:.(?!- code:))*'
+    match = re.search(pattern, yaml_content, re.DOTALL)
+
+    if match:
+        existing_aliases = re.search(r'(aliases:\s*\n(?:\s+- "[^"]+"\n)*)', match.group(0))
+        if existing_aliases:
+            # Add the new alias to the existing aliases
+            updated_aliases = existing_aliases.group(1) + f'    - "{new_alias}"\n'
+            yaml_content = (
+                yaml_content[: match.start()]
+                + match.group(0).replace(existing_aliases.group(1), updated_aliases)
+                + yaml_content[match.end() :]
+            )
+        else:
+            # Add the aliases key with the new alias
+            aliases = f'  aliases:\n    - "{new_alias}"\n'
+            yaml_content = yaml_content[: match.end()] + aliases + yaml_content[match.end() :]
+    else:
+        raise ValueError(f"Could not find region {target_name} in {LATEST_REGIONS_YML}")
+
+    return yaml_content
 
 
 def print_mapping(region: str, name: str) -> None:

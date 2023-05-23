@@ -46,6 +46,7 @@ log = structlog.get_logger()
 SelectOfScalar.inherit_cache = True  # type: ignore
 Select.inherit_cache = True  # type: ignore
 
+
 metadata = SQLModel.metadata
 
 
@@ -55,7 +56,8 @@ JSON = _JSON(none_as_null=True)
 
 def get_engine() -> _FutureEngine:
     return create_engine(
-        f"mysql://{config.DB_USER}:{quote(config.DB_PASS)}@{config.DB_HOST}:{config.DB_PORT}/{config.DB_NAME}"
+        f"mysql://{config.DB_USER}:{quote(config.DB_PASS)}@{config.DB_HOST}:{config.DB_PORT}/{config.DB_NAME}",
+        future=False,
     )
 
 
@@ -77,12 +79,13 @@ t_active_datasets = Table(
     Column("nonRedistributable", TINYINT(1), server_default=text("'0'")),
     Column("isArchived", TINYINT(1), server_default=text("'0'")),
     Column("sourceChecksum", String(64)),
+    extend_existing=True,
 )
 
 
 class Entity(SQLModel, table=True):
     __tablename__: str = "entities"  # type: ignore
-    __table_args__ = (Index("code", "code", unique=True), Index("name", "name", unique=True))
+    __table_args__ = (Index("code", "code", unique=True), Index("name", "name", unique=True), {"extend_existing": True})
 
     id: Optional[int] = Field(default=None, sa_column=Column("id", Integer, primary_key=True))
     name: str = Field(sa_column=Column("name", VARCHAR(255), nullable=False))
@@ -97,7 +100,10 @@ class Entity(SQLModel, table=True):
 
 class Namespace(SQLModel, table=True):
     __tablename__: str = "namespaces"  # type: ignore
-    __table_args__ = (Index("namespaces_name_uq", "name", unique=True),)
+    __table_args__ = (
+        Index("namespaces_name_uq", "name", unique=True),
+        {"extend_existing": True},
+    )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(sa_column=Column("name", String(255, "utf8mb4_0900_as_cs"), nullable=False))
@@ -127,6 +133,8 @@ class Namespace(SQLModel, table=True):
 
 
 class Posts(SQLModel, table=True):
+    __table_args__ = {"extend_existing": True}
+
     id: Optional[int] = Field(default=None, sa_column=Column("id", Integer, primary_key=True))
     title: str = Field(sa_column=Column("title", MEDIUMTEXT, nullable=False))
     slug: str = Field(sa_column=Column("slug", MEDIUMTEXT, nullable=False))
@@ -147,6 +155,7 @@ t_post_tags = Table(
     ForeignKeyConstraint(["post_id"], ["posts.id"], ondelete="CASCADE", name="FK_post_tags_post_id"),
     ForeignKeyConstraint(["tag_id"], ["tags.id"], ondelete="CASCADE", name="FK_post_tags_tag_id"),
     Index("FK_post_tags_tag_id", "tag_id"),
+    extend_existing=True,
 )
 
 
@@ -156,6 +165,7 @@ class Tag(SQLModel, table=True):
         ForeignKeyConstraint(["parentId"], ["tags.id"], name="tags_ibfk_1"),
         Index("dataset_subcategories_name_fk_dst_cat_id_6ce1cc36_uniq", "name", "parentId", unique=True),
         Index("parentId", "parentId"),
+        {"extend_existing": True},
     )
 
     id: Optional[int] = Field(default=None, sa_column=Column("id", Integer, primary_key=True))
@@ -175,7 +185,10 @@ class Tag(SQLModel, table=True):
 
 class User(SQLModel, table=True):
     __tablename__: str = "users"  # type: ignore
-    __table_args__ = (Index("email", "email", unique=True),)
+    __table_args__ = (
+        Index("email", "email", unique=True),
+        {"extend_existing": True},
+    )
 
     id: Optional[int] = Field(default=None, sa_column=Column("id", Integer, primary_key=True))
     password: str = Field(sa_column=Column("password", String(128, "utf8mb4_0900_as_cs"), nullable=False))
@@ -203,6 +216,7 @@ class ChartRevisions(SQLModel, table=True):
         ForeignKeyConstraint(["userId"], ["users.id"], name="chart_revisions_userId"),
         Index("chartId", "chartId"),
         Index("chart_revisions_userId", "userId"),
+        {"extend_existing": True},
     )
 
     id: Optional[int] = Field(default=None, sa_column=Column("id", BigInteger, primary_key=True))
@@ -222,6 +236,7 @@ class Chart(SQLModel, table=True):
         ForeignKeyConstraint(["publishedByUserId"], ["users.id"], name="charts_publishedByUserId"),
         Index("charts_lastEditedByUserId", "lastEditedByUserId"),
         Index("charts_publishedByUserId", "publishedByUserId"),
+        {"extend_existing": True},
     )
 
     id: Optional[int] = Field(default=None, sa_column=Column("id", Integer, primary_key=True))
@@ -241,6 +256,23 @@ class Chart(SQLModel, table=True):
     chart_tags: List["ChartTags"] = Relationship(back_populates="charts")
     suggested_chart_revisions: List["SuggestedChartRevisions"] = Relationship(back_populates="charts")
     chart_dimensions: List["ChartDimensions"] = Relationship(back_populates="charts")
+
+    @classmethod
+    def load_chart(cls, session: Session, chart_id: int) -> "Chart":
+        """Load chart with id `chart_id`."""
+        return session.exec(select(cls).where(cls.id == chart_id)).one()
+
+    @classmethod
+    def load_charts_using_variables(cls, session: Session, variable_ids: List[int]) -> List["Chart"]:
+        """Load charts that use any of the given variables in `variable_ids`."""
+        # Find IDs of charts
+        chart_ids = (
+            session.exec(select(ChartDimensions.chartId).where(ChartDimensions.variableId.in_(variable_ids)))  # type: ignore
+            .unique()
+            .all()
+        )
+        # Find charts
+        return session.exec(select(Chart).where(Chart.id.in_(chart_ids))).all()  # type: ignore
 
 
 class Dataset(SQLModel, table=True):
@@ -272,6 +304,7 @@ class Dataset(SQLModel, table=True):
         Index("datasets_metadataEditedByUserId", "metadataEditedByUserId"),
         Index("datasets_name_namespace_d3d60d22_uniq", "name", "namespace", unique=True),
         Index("unique_short_name_version_namespace", "shortName", "version", "namespace", unique=True),
+        {"extend_existing": True},
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -387,6 +420,7 @@ class ChartSlugRedirects(SQLModel, table=True):
         ForeignKeyConstraint(["chart_id"], ["charts.id"], name="chart_slug_redirects_chart_id"),
         Index("chart_slug_redirects_chart_id", "chart_id"),
         Index("slug", "slug", unique=True),
+        {"extend_existing": True},
     )
 
     id: Optional[int] = Field(default=None, sa_column=Column("id", Integer, primary_key=True))
@@ -401,6 +435,7 @@ class ChartTags(SQLModel, table=True):
         ForeignKeyConstraint(["chartId"], ["charts.id"], ondelete="CASCADE", name="FK_chart_tags_chartId"),
         ForeignKeyConstraint(["tagId"], ["tags.id"], name="FK_chart_tags_tagId"),
         Index("FK_chart_tags_tagId", "tagId"),
+        {"extend_existing": True},
     )
 
     chartId: int = Field(sa_column=Column("chartId", Integer, primary_key=True, nullable=False))
@@ -419,6 +454,7 @@ t_dataset_files = Table(
     Column("file", LONGBLOB, nullable=False),
     ForeignKeyConstraint(["datasetId"], ["datasets.id"], name="dataset_files_datasetId"),
     Index("dataset_files_datasetId", "datasetId"),
+    extend_existing=True,
 )
 
 
@@ -430,6 +466,7 @@ t_dataset_tags = Table(
     ForeignKeyConstraint(["datasetId"], ["datasets.id"], ondelete="CASCADE", name="FK_fa434de5c36953f4efce6b073b3"),
     ForeignKeyConstraint(["tagId"], ["tags.id"], ondelete="CASCADE", name="FK_2e330c9e1074b457d1d238b2dac"),
     Index("FK_2e330c9e1074b457d1d238b2dac", "tagId"),
+    extend_existing=True,
 )
 
 
@@ -463,6 +500,7 @@ class Source(SQLModel, table=True):
     __table_args__ = (
         ForeignKeyConstraint(["datasetId"], ["datasets.id"], name="sources_datasetId"),
         Index("sources_datasetId", "datasetId"),
+        {"extend_existing": True},
     )
 
     id: Optional[int] = Field(default=None, sa_column=Column("id", Integer, primary_key=True))
@@ -578,6 +616,7 @@ class Source(SQLModel, table=True):
 
 
 class SuggestedChartRevisions(SQLModel, table=True):
+    __tablename__: str = "suggested_chart_revisions"
     __table_args__ = (
         ForeignKeyConstraint(["chartId"], ["charts.id"], name="suggested_chart_revisions_ibfk_1"),
         ForeignKeyConstraint(["createdBy"], ["users.id"], name="suggested_chart_revisions_ibfk_2"),
@@ -585,6 +624,7 @@ class SuggestedChartRevisions(SQLModel, table=True):
         Index("chartId", "chartId", "originalVersion", "suggestedVersion", "isPendingOrFlagged", unique=True),
         Index("createdBy", "createdBy"),
         Index("updatedBy", "updatedBy"),
+        {"extend_existing": True},
     )
 
     id: Optional[int] = Field(default=None, sa_column=Column("id", BigInteger, primary_key=True))
@@ -626,10 +666,18 @@ class SuggestedChartRevisions(SQLModel, table=True):
             Computed("(if((`status` in (_utf8mb4'pending',_utf8mb4'flagged')),true,NULL))", persisted=False),
         ),
     )
+    changesInDataSummary: Optional[str] = Field(
+        default=None, sa_column=Column("changesInDataSummary", String(512, "utf8mb4_0900_as_cs"))
+    )
+    experimental: Optional[Dict[Any, Any]] = Field(sa_column=Column("experimental", JSON, nullable=False))
 
     charts: Optional["Chart"] = Relationship(back_populates="suggested_chart_revisions")
     users: Optional["User"] = Relationship(back_populates="suggested_chart_revisions")
     users_: Optional["User"] = Relationship(back_populates="suggested_chart_revisions_")
+
+    @classmethod
+    def load_pending(cls, session: Session):
+        return session.exec(select(SuggestedChartRevisions).where(SuggestedChartRevisions.status == "pending")).all()
 
 
 class DimensionFilter(TypedDict):
@@ -674,6 +722,7 @@ class Variable(SQLModel, table=True):
         Index("variables_datasetId_50a98bfd_fk_datasets_id", "datasetId"),
         Index("variables_name_fk_dst_id_f7453c33_uniq", "name", "datasetId", unique=True),
         Index("variables_sourceId_31fce80a_fk_sources_id", "sourceId"),
+        {"extend_existing": True},
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -700,6 +749,8 @@ class Variable(SQLModel, table=True):
     originalMetadata: Optional[Dict[Any, Any]] = Field(default=None, sa_column=Column("originalMetadata", JSON))
     grapherConfig: Optional[Dict[Any, Any]] = Field(default=None, sa_column=Column("grapherConfig", JSON))
     catalogPath: Optional[str] = Field(default=None, sa_column=Column("catalogPath", LONGTEXT))
+    dataPath: Optional[str] = Field(default=None, sa_column=Column("dataPath", LONGTEXT))
+    metadataPath: Optional[str] = Field(default=None, sa_column=Column("metadataPath", LONGTEXT))
     dimensions: Optional[Dimensions] = Field(sa_column=Column("dimensions", JSON, nullable=True))
 
     datasets: Optional["Dataset"] = Relationship(back_populates="variables")
@@ -746,6 +797,8 @@ class Variable(SQLModel, table=True):
             ds.coverage = self.coverage
             ds.display = self.display
             ds.catalogPath = self.catalogPath
+            ds.dataPath = self.dataPath
+            ds.metadataPath = self.metadataPath
             ds.dimensions = self.dimensions
             ds.updatedAt = datetime.utcnow()
             # do not update these fields unless they're specified
@@ -800,8 +853,19 @@ class Variable(SQLModel, table=True):
     def load_variable(cls, session: Session, variable_id: int) -> "Variable":
         return session.exec(select(cls).where(cls.id == variable_id)).one()
 
+    def s3_data_path(self) -> str:
+        """Path to S3 with data in JSON format for Grapher. Typically
+        s3://owid-catalog/baked-variables/live_grapher/data/123.json."""
+        return f"{config.BAKED_VARIABLES_PATH}/data/{self.id}.json"
+
+    def s3_metadata_path(self) -> str:
+        """Path to S3 with metadata in JSON format for Grapher. Typically
+        s3://owid-catalog/baked-variables/live_grapher/metadata/123.json."""
+        return f"{config.BAKED_VARIABLES_PATH}/metadata/{self.id}.json"
+
 
 class ChartDimensions(SQLModel, table=True):
+    __tablename__: str = "chart_dimensions"
     __table_args__ = (
         ForeignKeyConstraint(["chartId"], ["charts.id"], name="chart_dimensions_chartId_78d6a092_fk_charts_id"),
         ForeignKeyConstraint(
@@ -809,6 +873,7 @@ class ChartDimensions(SQLModel, table=True):
         ),
         Index("chart_dimensions_chartId_78d6a092_fk_charts_id", "chartId"),
         Index("chart_dimensions_variableId_9ba778e6_fk_variables_id", "variableId"),
+        {"extend_existing": True},
     )
 
     id: Optional[int] = Field(default=None, sa_column=Column("id", Integer, primary_key=True))
@@ -831,9 +896,11 @@ t_country_latest_data = Table(
     ForeignKeyConstraint(["variable_id"], ["variables.id"], name="country_latest_data_variable_id_foreign"),
     Index("country_latest_data_country_code_variable_id_unique", "country_code", "variable_id", unique=True),
     Index("country_latest_data_variable_id_foreign", "variable_id"),
+    extend_existing=True,
 )
 
 
+# data_values table is gonna be deprecated!
 class DataValues(SQLModel, table=True):
     __tablename__: str = "data_values"  # type: ignore
     __table_args__ = (
@@ -842,6 +909,7 @@ class DataValues(SQLModel, table=True):
         Index("data_values_fk_ent_id_fk_var_id_year_e0eee895_uniq", "entityId", "variableId", "year", unique=True),
         Index("data_values_variableId_variables_id", "variableId"),
         Index("data_values_year", "year"),
+        {"extend_existing": True},
     )
 
     value: str = Field(sa_column=Column("value", String(255, "utf8mb4_0900_as_cs"), nullable=False))

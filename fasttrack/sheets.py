@@ -1,4 +1,5 @@
 import concurrent.futures
+import datetime as dt
 from typing import Any, Dict, List, Optional, Tuple, cast
 
 import pandas as pd
@@ -14,34 +15,36 @@ class ValidationError(Exception):
 
 
 class PartialSnapshotMeta(BaseModel):
-
     url: str
     publication_year: Optional[int]
     license_url: Optional[str]
     license_name: Optional[str]
 
 
+# these IDs are taken from template sheet, they will be different if someone
+# creates a new sheet from scratch and use those names
+SHEET_TO_GID = {
+    "data": 409110122,
+    "variables_meta": 777328216,
+    "dataset_meta": 1719161864,
+    "sources_meta": 1399503534,
+}
+
+
 def import_google_sheets(url: str) -> Dict[str, Any]:
-    # these IDs are taken from template sheet
-    SHEET_TO_GID = {
-        "data": 409110122,
-        "variables_meta": 777328216,
-        "dataset_meta": 1719161864,
-        "sources_meta": 1399503534,
-    }
+    # read dataset first to check if we're using data_url instead of data sheet
+    dataset_meta = pd.read_csv(f"{url}&gid={SHEET_TO_GID['dataset_meta']}", header=None)
+    data_url = _get_data_url(dataset_meta, url)
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        data_future = executor.submit(lambda x: pd.read_csv(x), f"{url}&gid={SHEET_TO_GID['data']}")
+        data_future = executor.submit(lambda x: pd.read_csv(x), data_url)
         variables_meta_future = executor.submit(lambda x: pd.read_csv(x), f"{url}&gid={SHEET_TO_GID['variables_meta']}")
-        dataset_meta_future = executor.submit(
-            lambda x: pd.read_csv(x, header=None), f"{url}&gid={SHEET_TO_GID['dataset_meta']}"
-        )
         sources_meta_future = executor.submit(lambda x: pd.read_csv(x), f"{url}&gid={SHEET_TO_GID['sources_meta']}")
 
     return {
         "data": data_future.result(),
         "variables_meta": variables_meta_future.result(),
-        "dataset_meta": dataset_meta_future.result(),
+        "dataset_meta": dataset_meta,
         "sources_meta": sources_meta_future.result(),
     }
 
@@ -77,7 +80,14 @@ def parse_metadata_from_sheets(
     dataset_dict = _prune_empty(dataset_meta_df.set_index(0)[1].to_dict())  # type: ignore
     dataset_dict["namespace"] = "fasttrack"  # or should it be owid? or institution specific?
     dataset_dict.pop("updated")
+    dataset_dict.pop("external_csv", None)
     dataset_dict.setdefault("description", "")
+
+    try:
+        if dataset_dict["version"] != "latest":
+            dt.datetime.strptime(dataset_dict["version"], "%Y-%m-%d")
+    except ValueError:
+        raise ValidationError(f"Version `{dataset_dict['version']}` is not in YYYY-MM-DD format")
 
     # manadatory dataset fields
     for key in ("title", "short_name", "version"):
@@ -150,3 +160,18 @@ def _move_keys_to_the_end(d: Dict[str, Any], keys: List[str]) -> None:
 
 def _prune_empty(d: Dict[str, Any]) -> Dict[str, Any]:
     return {k: v for k, v in d.items() if v and not pd.isnull(v)}
+
+
+def _get_data_url(dataset_meta: pd.DataFrame, url: str) -> str:
+    """Get data url from dataset_meta field or use data sheet if dataset_meta is empty."""
+    data_url = dataset_meta.set_index(0)[1].to_dict().get("external_csv")
+
+    if data_url and not pd.isnull(data_url):
+        # files on Google Drive need modified link for downloading raw csv
+        if "drive.google.com" in data_url:
+            data_url = data_url.replace("file/d/", "uc?id=").replace("/view?usp=share_link", "&export=download")
+    else:
+        # use data sheet
+        data_url = f"{url}&gid={SHEET_TO_GID['data']}"
+
+    return data_url

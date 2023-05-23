@@ -14,9 +14,36 @@ from yaml.dumper import Dumper
 
 from etl.paths import BASE_DIR
 
-# runtime cache, we need locks because we usually run it in threads
-cache_md5: Dict[str, str] = {}
-cache_md5_locks: Dict[str, Lock] = {}
+
+class RuntimeCache:
+    """Runtime cache, we need locks because we usually run it in threads."""
+
+    _cache: Dict[str, str]
+    _locks: Dict[str, Lock]
+
+    def __init__(self):
+        self._cache = {}
+        self._locks = {}
+
+    def __contains__(self, key):
+        return key in self._cache
+
+    def __getitem__(self, key: str) -> str:
+        return self._cache[key]
+
+    def add(self, key: str, value: Any) -> None:
+        if key not in self._locks:
+            self._locks[key] = Lock()
+
+        with self._locks[key]:
+            self._cache[key] = value
+
+    def clear(self) -> None:
+        self._cache = {}
+        self._locks = {}
+
+
+CACHE_CHECKSUM_FILE = RuntimeCache()
 
 
 def checksum_file_nocache(filename: Union[str, Path]) -> str:
@@ -37,13 +64,10 @@ def checksum_file(filename: Union[str, Path]) -> str:
     if isinstance(filename, Path):
         filename = filename.as_posix()
 
-    if filename not in cache_md5:
-        cache_md5_locks[filename] = Lock()
+    if filename not in CACHE_CHECKSUM_FILE:
+        CACHE_CHECKSUM_FILE.add(filename, checksum_file_nocache(filename))
 
-        with cache_md5_locks[filename]:
-            cache_md5[filename] = checksum_file_nocache(filename)
-
-    return cache_md5[filename]
+    return CACHE_CHECKSUM_FILE[filename]
 
 
 def checksum_str(s: str) -> str:
@@ -84,7 +108,8 @@ _MyDumper.add_representer(
 
 def yaml_dump(d: Dict[str, Any], stream: Optional[TextIO] = None, strip_lines: bool = True) -> Optional[str]:
     """Alternative to yaml.dump which produces good looking multi-line strings and perserves ordering
-    of keys."""
+    of keys. If strip_lines is True, all lines in the string will be stripped and all tabs will be
+    replaced by two spaces."""
     # strip lines, otherwise YAML won't output strings in literal format
     if strip_lines:
         d = _strip_lines_in_dict(d)
@@ -94,7 +119,10 @@ def yaml_dump(d: Dict[str, Any], stream: Optional[TextIO] = None, strip_lines: b
 def _strip_lines(s: str) -> str:
     """Strip all lines in a string."""
     s = "\n".join([line.strip() for line in s.split("\n")])
-    return s.strip()
+    s = s.strip()
+
+    # replace tabs by spaces, otherwise YAML won't output strings in literal format
+    return s.replace("\t", "  ")
 
 
 def _strip_lines_in_dict(d: Any) -> Any:

@@ -27,16 +27,25 @@ steps:
     - walden://who/2022-09-30/ghe
   data://garden/who/2021-07-01/ghe:
     - data://meadow/who/2021-07-01/ghe
-    - data://garden/reference
+    - data://garden/regions/2023-01-01/regions
   data://garden/who/2022-09-30/ghe:
     - data://meadow/who/2022-09-30/ghe
-    - data://garden/reference
+    - data://garden/un/2022-07-11/un_wpp
+    - data://garden/regions/2023-01-01/regions
   data://grapher/who/2022-09-30/ghe:
     - data://garden/who/2022-09-30/ghe
 
   #WHO - Global Health Observatory (Incomplete; waiting for WHO API update)
   data://meadow/who/2021-07-01/gho:
     - walden://who/2021-07-01/gho
+  # WHO - Global Health Observatory (only suicides variable)
+  data://meadow/who/2023-03-09/gho_suicides:
+    - snapshot://who/2023-03-09/gho_suicides.json
+  data://garden/who/2023-03-09/gho_suicides:
+    - data://meadow/who/2023-03-09/gho_suicides
+  data://grapher/who/2023-03-09/gho_suicides:
+    - data://garden/who/2023-03-09/gho_suicides
+
   # IHME Global Burden of Disease
   data://meadow/ihme_gbd/2020-12-19/child_mortality:
     - walden://ihme_gbd/2020-12-19/child_mortality
@@ -70,7 +79,20 @@ steps:
     - data://garden/ihme_gbd/2019/gbd_prevalence
   data://grapher/ihme_gbd/2019/gbd_child_mortality:
     - data://garden/ihme_gbd/2019/gbd_child_mortality
+  data://meadow/ihme_gbd/2023-05-15/gbd_mental_health_prevalence_rate:
+    - snapshot://ihme_gbd/2023-05-15/gbd_mental_health_prevalence_rate.zip
+  data://garden/ihme_gbd/2023-05-15/gbd_mental_health_prevalence_rate:
+    - data://meadow/ihme_gbd/2023-05-15/gbd_mental_health_prevalence_rate
+  data://grapher/ihme_gbd/2023-05-15/gbd_mental_health_prevalence_rate:
+  - data://garden/ihme_gbd/2023-05-15/gbd_mental_health_prevalence_rate
 
+  # Temporary additional to add Drug Disorders to grapher
+  data-private://meadow/ihme_gbd/2023-03-29/gbd_drug_disorders:
+    - snapshot-private://ihme_gbd/2023-03-29/gbd_drug_disorders.csv
+  data-private://garden/ihme_gbd/2023-03-29/gbd_drug_disorders:
+    - data-private://meadow/ihme_gbd/2023-03-29/gbd_drug_disorders
+  data-private://grapher/ihme_gbd/2023-03-29/gbd_drug_disorders:
+    - data-private://garden/ihme_gbd/2023-03-29/gbd_drug_disorders
 
   # Postnatal care coverage - World Bank (2022)
   data://meadow/postnatal_care/2022-09-19/postnatal_care:
@@ -79,3 +101,74 @@ steps:
     - data://meadow/postnatal_care/2022-09-19/postnatal_care
   data://grapher/postnatal_care/2022-09-19/postnatal_care:
     - data://garden/postnatal_care/2022-09-19/postnatal_care
+
+  # FluNet and FluID - WHO Flu Databases
+  data://meadow/who/latest/flunet:
+    - snapshot://who/latest/flunet.csv
+  data://garden/who/latest/flunet:
+    - data://meadow/who/latest/flunet
+  data://meadow/who/latest/fluid:
+    - snapshot://who/latest/fluid.csv
+  data://garden/who/latest/fluid:
+    - data://meadow/who/latest/fluid
+  data://explorers/who/latest/flu:
+    - data://garden/who/latest/fluid
+    - data://garden/who/latest/flunet
+
+  # Flu vaccine policy - https://immunizationdata.who.int/pages/indicators-by-category/influenza.html?YEAR=
+  data://meadow/who/2023-04-03/flu_vaccine_policy:
+    - snapshot://who/2023-04-03/flu_vaccine_policy.xlsx
+  data://garden/who/2023-04-03/flu_vaccine_policy:
+    - data://meadow/who/2023-04-03/flu_vaccine_policy
+  data://grapher/who/2023-04-03/flu_vaccine_policy:
+    - data://garden/who/2023-04-03/flu_vaccine_policy
+
+  # WHO flu vaccination of elderly - https://immunizationdata.who.int/pages/coverage/flu.html?ANTIGEN=FLU_ELDERLY&YEAR=
+  data://meadow/who/2023-04-03/flu_elderly:
+    - snapshot://who/2023-04-03/flu_elderly.xlsx
+  data://garden/who/2023-04-03/flu_elderly:
+    - data://meadow/who/2023-04-03/flu_elderly
+  data://grapher/who/2023-04-03/flu_elderly:
+    - data://garden/who/2023-04-03/flu_elderly
+
+  # Registered vehicles per 1000 people
+  data://garden/who/2023-03-13/vehicles:
+    - data://garden/owid/latest/key_indicators
+    - backport://backport/owid/latest/dataset_5676_global_health_observatory__world_health_organization__2022_08
+  data://grapher/who/2023-03-13/vehicles:
+    - data://garden/who/2023-03-13/vehicles
+
+  # WGM 2020
+  data://meadow/health/2023-04-18/wgm_mental_health:
+    - snapshot://health/2023-04-18/wgm_mental_health.zip
+  data://garden/health/2023-04-18/wgm_mental_health:
+    - data://meadow/health/2023-04-18/wgm_mental_health
+    - data://garden/regions/2023-01-01/regions
+    - data://garden/wb/2021-07-01/wb_income
+  data://grapher/health/2023-04-19/wgm_mental_health:
+    - data://garden/health/2023-04-18/wgm_mental_health
+  # WGM 2018
+  data://meadow/health/2023-04-25/wgm_2018:
+    - snapshot://health/2023-04-25/wgm_2018.xlsx
+  data://garden/health/2023-04-25/wgm_2018:
+    - data://meadow/health/2023-04-25/wgm_2018
+    - data://garden/regions/2023-01-01/regions
+    - data://garden/wb/2021-07-01/wb_income
+  data://grapher/health/2023-04-26/wgm_2018:
+    - data://garden/health/2023-04-25/wgm_2018
+
+  # OECD: Pharmaceutical Market
+  data://meadow/oecd/2023-05-01/health_pharma_market:
+    - snapshot://oecd/2023-05-01/health_pharma_market.csv
+  data://garden/oecd/2023-05-01/health_pharma_market:
+    - data://meadow/oecd/2023-05-01/health_pharma_market
+  data://grapher/oecd/2023-05-01/health_pharma_market:
+    - data://garden/oecd/2023-05-01/health_pharma_market
+
+  # Global Wellbeing Initiative (2020)
+  data://meadow/health/2023-05-04/global_wellbeing:
+    - snapshot://health/2023-05-04/global_wellbeing.xlsx
+  data://garden/health/2023-05-04/global_wellbeing:
+    - data://meadow/health/2023-05-04/global_wellbeing
+  data://grapher/health/2023-05-04/global_wellbeing:
+    - data://garden/health/2023-05-04/global_wellbeing

@@ -23,7 +23,7 @@ EXCLUDE_STEP_TYPES = ("grapher", "walden", "walden-private", "github")
     "--dag-path",
     type=click.Path(exists=True),
     help="Path to DAG yaml file",
-    default=paths.DAG_FILE,
+    default=paths.DEFAULT_DAG_FILE,
 )
 @click.option(
     "--data-dir",
@@ -42,7 +42,7 @@ def prune_cli(
 
 
 def prune(
-    dag_path: Path = paths.DAG_FILE,
+    dag_path: Path = paths.DEFAULT_DAG_FILE,
     data_dir: Path = paths.DATA_DIR,
     dry_run: bool = False,
 ) -> None:
@@ -80,8 +80,7 @@ def dag_datasets_dirs(dag_path: Path) -> Set[str]:
             path = parts.netloc + parts.path
             dataset_dirs.append(path)
 
-    # NOTE: garden/reference is a special dataset with tables commited to git
-    return set(dataset_dirs) | {"garden/reference"}
+    return set(dataset_dirs)
 
 
 def local_datasets_dirs(data_dir: Path) -> Set[str]:

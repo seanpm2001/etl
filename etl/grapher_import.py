@@ -9,7 +9,7 @@ Usage:
     >>> import_dataset.main(dataset_dir, dataset_namespace)
 """
 
-import concurrent.futures
+import datetime
 import os
 from dataclasses import dataclass
 from threading import Lock
@@ -19,12 +19,17 @@ import pandas as pd
 import structlog
 from owid import catalog
 from owid.catalog import utils
-from sqlalchemy import Integer, String
-from sqlmodel import Session, delete, select, update
-from tenacity import retry, stop
+from sqlalchemy.engine.base import Engine
+from sqlmodel import Session, select, update
 
+from backport.datasync.data_metadata import (
+    add_entity_code_and_name,
+    variable_data,
+    variable_metadata,
+)
+from backport.datasync.datasync import upload_gzip_dict
 from etl import config
-from etl.db import get_engine, open_db
+from etl.db import open_db
 
 from . import grapher_helpers as gh
 from . import grapher_model as gm
@@ -44,16 +49,6 @@ INT_TYPES = (
     "Int64",
 )
 
-# exclude the following datasets from upserting into data_values table as they
-# are too large
-# once we switch to catalogPath, no data will be upserted to data_values
-BLACKLIST_DATASETS_DATA_VALUES_UPSERTS = [
-    "gbd_cause",
-    "gbd_risk",
-    "gbd_prevalence",
-    "gbd_child_mortality",
-]
-
 
 @dataclass
 class DatasetUpsertResult:
@@ -67,7 +62,9 @@ class VariableUpsertResult:
     source_id: int
 
 
-def upsert_dataset(dataset: catalog.Dataset, namespace: str, sources: List[catalog.meta.Source]) -> DatasetUpsertResult:
+def upsert_dataset(
+    engine: Engine, dataset: catalog.Dataset, namespace: str, sources: List[catalog.meta.Source]
+) -> DatasetUpsertResult:
     assert dataset.metadata.short_name, "Dataset must have a short_name"
     assert dataset.metadata.version, "Dataset must have a version"
     assert dataset.metadata.title, "Dataset must have a title"
@@ -80,8 +77,6 @@ def upsert_dataset(dataset: catalog.Dataset, namespace: str, sources: List[catal
             " `combine_metadata_sources` or `adapt_dataset_metadata_for_grapher` to"
             " join multiple sources"
         )
-
-    engine = gm.get_engine()
 
     short_name = dataset.metadata.short_name
 
@@ -158,6 +153,7 @@ def _update_variables_display(table: catalog.Table) -> None:
 
 
 def upsert_table(
+    engine: Engine,
     table: catalog.Table,
     dataset_upsert_result: DatasetUpsertResult,
     catalog_path: Optional[str] = None,
@@ -200,7 +196,7 @@ def upsert_table(
 
     _update_variables_display(table)
 
-    with Session(gm.get_engine()) as session:
+    with Session(engine) as session:
         log.info("upsert_table.upsert_variable", variable=table.columns[0])
 
         # For easy retrieveal of the value series we store the name
@@ -242,22 +238,39 @@ def upsert_table(
             catalog_path=catalog_path,
             dimensions=dimensions,
         ).upsert(session)
-        assert variable.id
+        variable_id = variable.id
+        assert variable_id
 
+        df = table.rename(columns={column_name: "value", "entity_id": "entityId"})
+
+        # following functions assume that `value` is string
+        df["value"] = df["value"].astype(str)
+
+        # NOTE: we could prefetch all entities in advance, but it's not a bottleneck as it takes
+        # less than 10ms per variable
+        df = add_entity_code_and_name(engine, df)
+
+        # process and upload data to S3
+        var_data = variable_data(df)
+        data_path = upload_gzip_dict(var_data, variable.s3_data_path())
+
+        # we need to commit changes because we use SQL command in `variable_metadata`. We wouldn't
+        # have to if we used ORM instead
+        session.add(variable)
         session.commit()
 
-        # delete its data to refresh it later
-        q = delete(gm.DataValues).where(gm.DataValues.variableId == variable.id)
-        session.execute(q)
+        # process and upload metadata to S3
+        var_metadata = variable_metadata(engine, variable_id, df)
+        metadata_path = upload_gzip_dict(var_metadata, variable.s3_metadata_path())
+
+        variable.dataPath = data_path
+        variable.metadataPath = metadata_path
+        session.add(variable)
         session.commit()
 
-        df = table.rename(columns={column_name: "value", "entity_id": "entityId"}).assign(variableId=variable.id)
+        log.info("upsert_table.uploaded_to_s3", size=len(table), variable_id=variable_id)
 
-        if table.metadata.dataset.short_name not in BLACKLIST_DATASETS_DATA_VALUES_UPSERTS:
-            insert_to_data_values(df)
-            log.info("upsert_table.upserted_data_values", size=len(table))
-
-        return VariableUpsertResult(variable.id, source_id)
+        return VariableUpsertResult(variable_id, source_id)  # type: ignore
 
 
 def fetch_db_checksum(dataset: catalog.Dataset) -> Optional[str]:
@@ -279,9 +292,17 @@ def fetch_db_checksum(dataset: catalog.Dataset) -> Optional[str]:
         return ds.sourceChecksum if ds is not None else None
 
 
-def set_dataset_checksum(dataset_id: int, checksum: str) -> None:
+def set_dataset_checksum_and_editedAt(dataset_id: int, checksum: str) -> None:
     with Session(gm.get_engine()) as session:
-        q = update(gm.Dataset).where(gm.Dataset.id == dataset_id).values(sourceChecksum=checksum)
+        q = (
+            update(gm.Dataset)
+            .where(gm.Dataset.id == dataset_id)
+            .values(
+                sourceChecksum=checksum,
+                dataEditedAt=datetime.datetime.utcnow(),
+                metadataEditedAt=datetime.datetime.utcnow(),
+            )
+        )
         session.execute(q)
         session.commit()
 
@@ -325,11 +346,13 @@ def cleanup_ghost_variables(dataset_id: int, upserted_variable_ids: List[int], w
             rows = pd.DataFrame(rows, columns=["chartId", "variableId"])
             raise ValueError(f"Variables used in charts will not be deleted automatically:\n{rows}")
 
-        # first delete data_values
-        # NOTE: deleting 100 variables takes ~30s with 10 workers with threading
-        # and about ~3mins when deleting them in batch
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            list(executor.map(_delete_variable_from_data_values, variable_ids_to_delete))
+        # there might still be some data_values for old variables
+        db.cursor.execute(
+            """
+            DELETE FROM data_values WHERE variableId IN %(variable_ids)s
+        """,
+            {"variable_ids": variable_ids_to_delete},
+        )
 
         # then variables themselves with related data in other tables
         db.cursor.execute(
@@ -352,16 +375,6 @@ def cleanup_ghost_variables(dataset_id: int, upserted_variable_ids: List[int], w
         )
 
 
-def _delete_variable_from_data_values(variable_id: int) -> None:
-    with open_db() as db:
-        db.cursor.execute(
-            """
-                    DELETE FROM data_values WHERE variableId = %(variable_id)s
-                """,
-            {"variable_id": variable_id},
-        )
-
-
 def cleanup_ghost_sources(dataset_id: int, upserted_source_ids: List[int]) -> None:
     """Remove all leftover sources that didn't get upserted into DB during grapher step.
     This could happen when you rename or delete sources.
@@ -377,26 +390,3 @@ def cleanup_ghost_sources(dataset_id: int, upserted_source_ids: List[int]) -> No
         )
         if db.cursor.rowcount > 0:
             log.warning(f"Deleted {db.cursor.rowcount} ghost sources")
-
-
-@retry(stop=stop.stop_after_attempt(3))
-def insert_to_data_values(df: pd.DataFrame) -> None:
-    """Insert data into data_values table. Retry in case we get Deadlock error."""
-    # value will be converted to string in MySQL, we need to do it beforehand otherwise
-    # it's gonna assume it is float64 and mess up precision for smaller types
-    df.value = df.value.astype(str)
-
-    # insert data to data_values using pandas which is both faster and doesn't raise
-    # deadlocks
-    df.to_sql(
-        "data_values",
-        get_engine(),
-        if_exists="append",
-        index=False,
-        dtype={
-            "value": String(255),
-            "year": Integer(),
-            "entityId": Integer(),
-            "variableId": Integer(),
-        },
-    )

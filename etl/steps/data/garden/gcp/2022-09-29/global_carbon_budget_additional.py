@@ -13,7 +13,7 @@ from owid.catalog import Dataset, Table
 from shared import CURRENT_DIR
 
 from etl.data_helpers import geo
-from etl.helpers import Names
+from etl.helpers import PathFinder
 
 # Regions and income groups to create (by aggregating), following OWID definitions.
 REGIONS = [
@@ -33,7 +33,7 @@ REGIONS = [
 AGGREGATES = {"production_emissions": "sum", "consumption_emissions": "sum"}
 
 # Naming conventions.
-N = Names(str(CURRENT_DIR / "global_carbon_budget_additional"))
+N = PathFinder(str(CURRENT_DIR / "global_carbon_budget_additional"))
 
 
 def prepare_national_and_global_data(
@@ -266,6 +266,7 @@ def run(dest_dir: str) -> None:
     # Create a new garden dataset and use metadata from meadow dataset.
     ds_garden = Dataset.create_empty(dest_dir)
     ds_garden.metadata = ds_meadow.metadata
+    ds_garden.metadata.short_name = N.short_name
     # Update metadata using the information in the yaml file.
     ds_garden.metadata.update_from_yaml(N.metadata_path, if_source_exists="replace")
 

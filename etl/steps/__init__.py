@@ -23,8 +23,10 @@ import pandas as pd
 import requests
 import structlog
 import yaml
-from dvc.dvcfile import Dvcfile
+from dvc.dvcfile import load_file
 from dvc.repo import Repo
+
+from etl.db import get_engine
 
 # smother deprecation warnings by papermill
 with warnings.catch_warnings():
@@ -44,21 +46,18 @@ from etl.grapher_import import (
     cleanup_ghost_sources,
     cleanup_ghost_variables,
     fetch_db_checksum,
-    set_dataset_checksum,
+    set_dataset_checksum_and_editedAt,
     upsert_dataset,
     upsert_table,
 )
+from etl.snapshot import _unignore_backports
 
 log = structlog.get_logger()
 
 Graph = Dict[str, Set[str]]
 DAG = Dict[str, Any]
 
-# runtime cache
-cache: Dict[str, Any] = {}
 dvc_lock = Lock()
-
-DVC_REPO = Repo(paths.BASE_DIR)
 
 
 def compile_steps(
@@ -147,7 +146,7 @@ def traverse(graph: Graph, nodes: Set[str]) -> Graph:
     return dict(reachable)
 
 
-def load_dag(filename: Union[str, Path] = paths.DAG_FILE) -> Dict[str, Any]:
+def load_dag(filename: Union[str, Path] = paths.DEFAULT_DAG_FILE) -> Dict[str, Any]:
     return _load_dag(filename, {})
 
 
@@ -173,7 +172,9 @@ def _load_dag_yaml(filename: str) -> Dict[str, Any]:
 
 
 def _parse_dag_yaml(dag: Dict[str, Any]) -> Dict[str, Any]:
-    return {node: set(deps) if deps else set() for node, deps in (dag["steps"] or {}).items()}
+    steps = dag["steps"] or {}
+
+    return {node: set(deps) if deps else set() for node, deps in steps.items()}
 
 
 def reverse_graph(graph: Graph) -> Graph:
@@ -207,10 +208,7 @@ def parse_step(step_name: str, dag: Dict[str, Any]) -> "Step":
 
     step: Step
     if step_type == "data":
-        if path == "garden/reference":
-            step = ReferenceStep(path)
-        else:
-            step = DataStep(path, dependencies)
+        step = DataStep(path, dependencies)
 
     elif step_type == "walden":
         step = WaldenStep(path)
@@ -246,6 +244,82 @@ def parse_step(step_name: str, dag: Dict[str, Any]) -> "Step":
         raise Exception(f"no recipe for executing step: {step_name}")
 
     return step
+
+
+def extract_step_attributes(step: str) -> Dict[str, str]:
+    """Extract attributes of a step from its name in the dag.
+
+    Parameters
+    ----------
+    step : str
+        Step (as it appears in the dag).
+
+    Returns
+    -------
+    step : str
+        Step (as it appears in the dag).
+    kind : str
+        Kind of step (namely, 'public' or 'private').
+    channel: str
+        Channel (e.g. 'meadow').
+    namespace: str
+        Namespace (e.g. 'energy').
+    version: str
+        Version (e.g. '2023-01-26').
+    name: str
+        Short name of the dataset (e.g. 'primary_energy').
+    identifier : str
+        Identifier of the step that is independent of the kind and of the version of the step.
+
+    """
+    # Extract the prefix (whatever is on the left of the '://') and the root of the step name.
+    prefix, root = step.split("://")
+
+    # Field 'kind' informs whether the dataset is public or private.
+    if "private" in prefix:
+        kind = "private"
+    else:
+        kind = "public"
+
+    # From now on we remove the 'public' or 'private' from the prefix.
+    prefix = prefix.split("-")[0]
+
+    if prefix in ["etag", "github"]:
+        # Special kinds of steps.
+        channel = "etag"
+        namespace = "etag"
+        version = "latest"
+        name = root
+        identifier = root
+    elif prefix in ["snapshot", "walden"]:
+        # Ingestion steps.
+        channel = prefix
+
+        # Extract attributes from root of the step.
+        namespace, version, name = root.split("/")
+
+        # Define an identifier for this step, that is identical for all versions.
+        identifier = f"{channel}/{namespace}/{name}"
+    else:
+        # Regular data steps.
+
+        # Extract attributes from root of the step.
+        channel, namespace, version, name = root.split("/")
+
+        # Define an identifier for this step, that is identical for all versions.
+        identifier = f"{channel}/{namespace}/{name}"
+
+    attributes = {
+        "step": step,
+        "kind": kind,
+        "channel": channel,
+        "namespace": namespace,
+        "version": version,
+        "name": name,
+        "identifier": identifier,
+    }
+
+    return attributes
 
 
 class Step(Protocol):
@@ -372,8 +446,7 @@ class DataStep(Step):
         return catalog.Dataset(self._dest_dir.as_posix())
 
     def checksum_output(self) -> str:
-        # This cast from str to str is IMHO unnecessary but MyPy complains about this without it...
-        return cast(str, self._output_dataset.checksum())
+        return self._output_dataset.checksum()
 
     def _step_files(self) -> List[str]:
         "Return a list of code files defining this step."
@@ -439,27 +512,6 @@ class DataStep(Step):
                     stderr_file=ostream,
                     cwd=notebook_path.parent.as_posix(),
                 )
-
-
-@dataclass
-class ReferenceStep(DataStep):
-    """
-    A step that marks a dependency on a local dataset. It never runs, but it will checksum
-    the local dataset and trigger rebuilds if the local dataset changes.
-    """
-
-    def __init__(self, path: str) -> None:
-        self.path = path
-        self.dependencies = []
-
-    def is_dirty(self) -> bool:
-        return False
-
-    def can_execute(self) -> bool:
-        return True
-
-    def run(self) -> None:
-        return
 
 
 @dataclass
@@ -530,7 +582,8 @@ class SnapshotStep(Step):
         return f"snapshot://{self.path}"
 
     def run(self) -> None:
-        DVC_REPO.pull(self._path, remote="public-read", force=True)
+        with _unignore_backports(Path(self._path)):
+            Repo(paths.BASE_DIR).pull(self._path, remote="public-read", force=True)
 
     def is_dirty(self) -> bool:
         # check if the snapshot has been added to DVC
@@ -538,9 +591,10 @@ class SnapshotStep(Step):
             if "outs:\n" not in istream.read():
                 raise Exception(f"File {self._dvc_path} has not been added to DVC. Run snapshot script to add it.")
 
-        with dvc_lock:
-            dvc_file = Dvcfile(DVC_REPO, self._dvc_path)
-            with DVC_REPO.lock:
+        with _unignore_backports(Path(self._dvc_path)), dvc_lock:
+            repo = Repo(paths.BASE_DIR)
+            dvc_file = load_file(repo, self._dvc_path)
+            with repo.lock:
                 # DVC returns empty dictionary if file is up to date
                 return dvc_file.stage.status() != {}
 
@@ -564,7 +618,8 @@ class SnapshotStepPrivate(SnapshotStep):
         return f"snapshot-private://{self.path}"
 
     def run(self) -> None:
-        DVC_REPO.pull(self._path, remote="private", force=True)
+        with _unignore_backports(Path(self._path)):
+            Repo(paths.BASE_DIR).pull(self._path, remote="private", force=True)
 
 
 class GrapherStep(Step):
@@ -608,8 +663,11 @@ class GrapherStep(Step):
 
         dataset.metadata = gh._adapt_dataset_metadata_for_grapher(dataset.metadata)
 
+        engine = get_engine()
+
         assert dataset.metadata.namespace
         dataset_upsert_results = upsert_dataset(
+            engine,
             dataset,
             dataset.metadata.namespace,
             dataset.metadata.sources,
@@ -628,6 +686,7 @@ class GrapherStep(Step):
             # generate table with entity_id, year and value for every column
             tables = gh._yield_wide_table(table, na_action="drop")
             upsert = lambda t: upsert_table(  # noqa: E731
+                engine,
                 t,
                 dataset_upsert_results,
                 catalog_path=catalog_path,
@@ -636,7 +695,6 @@ class GrapherStep(Step):
 
             # insert data in parallel, this speeds it up considerably and is even faster than loading
             # data with LOAD DATA INFILE
-            # TODO: remove threads once we get rid of inserts into data_values
             if config.GRAPHER_INSERT_WORKERS > 1:
                 with concurrent.futures.ThreadPoolExecutor(max_workers=config.GRAPHER_INSERT_WORKERS) as executor:
                     results = executor.map(upsert, tables)
@@ -647,8 +705,8 @@ class GrapherStep(Step):
 
         self._cleanup_ghost_resources(dataset_upsert_results, variable_upsert_results)
 
-        # set checksum after all data got inserted
-        set_dataset_checksum(dataset_upsert_results.dataset_id, self.data_step.checksum_input())
+        # set checksum and updatedAt timestamps after all data got inserted
+        set_dataset_checksum_and_editedAt(dataset_upsert_results.dataset_id, self.data_step.checksum_input())
 
     def checksum_output(self) -> str:
         raise NotImplementedError("GrapherStep should not be used as an input")
@@ -793,7 +851,32 @@ class BackportStepPrivate(PrivateMixin, BackportStep):
 
 def select_dirty_steps(steps: List[Step], max_workers: int) -> List[Step]:
     """Select dirty steps using threadpool."""
+    # dynamically add cached version of `is_dirty` to all steps to avoid re-computing
+    # this is a bit hacky, but it's the easiest way to only cache it here without
+    # affecting the rest
+    cache_is_dirty = files.RuntimeCache()
+    for s in steps:
+        _add_is_dirty_cached(s, cache_is_dirty)
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         steps_dirty = executor.map(lambda s: s.is_dirty(), steps)  # type: ignore
         steps = [s for s, is_dirty in zip(steps, steps_dirty) if is_dirty]
+
+    cache_is_dirty.clear()
+
     return steps
+
+
+def _cached_is_dirty(self: Step, cache: files.RuntimeCache) -> bool:
+    key = str(self)
+    if key not in cache:
+        cache.add(key, self._is_dirty())  # type: ignore
+    return cache[key]  # type: ignore
+
+
+def _add_is_dirty_cached(s: Step, cache: files.RuntimeCache) -> None:
+    """Save copy of a method to _is_dirty and replace it with a cached version."""
+    s._is_dirty = s.is_dirty  # type: ignore
+    s.is_dirty = lambda s=s: _cached_is_dirty(s, cache)  # type: ignore
+    for dep in getattr(s, "dependencies", []):
+        _add_is_dirty_cached(dep, cache)

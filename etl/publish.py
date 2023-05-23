@@ -7,6 +7,7 @@ import concurrent.futures
 import re
 import sys
 from collections.abc import Iterable
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, Iterator, Optional, cast
 from urllib.error import HTTPError
@@ -15,6 +16,7 @@ import boto3
 import click
 import pandas as pd
 from botocore.client import ClientError
+from botocore.config import Config
 from owid.catalog import CHANNEL, LocalCatalog
 from owid.catalog.catalogs import INDEX_FORMATS
 from owid.catalog.datasets import FileFormat
@@ -260,7 +262,7 @@ def get_remote_checksum(s3: Any, bucket: str, path: str) -> Optional[str]:
     return object_md5(s3, bucket, path, obj)
 
 
-def connect_s3() -> Any:
+def connect_s3(s3_config: Optional[Config] = None) -> Any:
     # TODO: use https://github.com/owid/data-utils-py/blob/main/owid/datautils/io/s3.py
     session = boto3.Session()
     return session.client(
@@ -269,7 +271,15 @@ def connect_s3() -> Any:
         endpoint_url=config.S3_ENDPOINT_URL,
         aws_access_key_id=config.S3_ACCESS_KEY,
         aws_secret_access_key=config.S3_SECRET_KEY,
+        config=s3_config,
     )
+
+
+@lru_cache(maxsize=None)
+def connect_s3_cached(s3_config: Optional[Config] = None) -> Any:
+    """Connect to S3, but cache the connection for subsequent calls. This is more efficient than
+    creating a new connection for every request."""
+    return connect_s3(s3_config)
 
 
 def _channel_path(channel: CHANNEL, format: FileFormat) -> Path:

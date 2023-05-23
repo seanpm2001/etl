@@ -12,11 +12,21 @@ from pywebio import output as po
 
 from etl import config
 from etl.files import apply_black_formatter_to_files
-from etl.paths import DAG_DIR, SNAPSHOTS_DIR, STEP_DIR
+from etl.paths import (
+    DAG_DIR,
+    LATEST_POPULATION_VERSION,
+    LATEST_REGIONS_VERSION,
+    SNAPSHOTS_DIR,
+    STEP_DIR,
+)
 from etl.steps import DAG
 
 DAG_WALKTHROUGH_PATH = DAG_DIR / "walkthrough.yml"
 WALDEN_INGEST_DIR = Path(walden.__file__).parent.parent.parent / "ingests"
+
+# Load latest dataset versions
+DATASET_POPULATION_URI = f"data://garden/demography/{LATEST_POPULATION_VERSION}/population"
+DATASET_REGIONS_URI = f"data://garden/regions/{LATEST_REGIONS_VERSION}/regions"
 
 DUMMY_DATA = {
     "namespace": "dummy",
@@ -33,6 +43,9 @@ DUMMY_DATA = {
     "source_published_by": "Dummy full source citation",
     "url": "https://www.url-dummy.com/",
 }
+
+# state shared between steps
+APP_STATE = {}
 
 
 def validate_short_name(short_name: str) -> Optional[str]:

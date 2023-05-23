@@ -10,11 +10,9 @@ import pandas as pd
 import structlog
 from owid import catalog
 from owid.catalog.utils import underscore
-from owid.datautils import dataframes
 
 from etl.db import get_connection, get_engine
 from etl.db_utils import DBUtils
-from etl.paths import REFERENCE_DATASET
 
 log = structlog.get_logger()
 
@@ -54,6 +52,9 @@ def _yield_wide_table(
         for col in table.columns:
             if table[col].isna().any():
                 raise ValueError(f"Column `{col}` contains missing values")
+    cols_with_none_units = [col for col in table.columns if table[col].metadata.unit is None]
+    if cols_with_none_units:
+        raise Exception("Columns with missing units: " + ", ".join(cols_with_none_units))
 
     dim_names = [k for k in table.primary_key if k not in ("year", "entity_id")]
     if dim_titles:
@@ -201,12 +202,6 @@ def long_to_wide_tables(
         yield cast(catalog.Table, t)
 
 
-def _get_entities_from_countries_regions(by: Literal["name", "code"] = "name") -> Dict[str, int]:
-    reference_dataset = catalog.Dataset(REFERENCE_DATASET)
-    countries_regions = reference_dataset["countries_regions"].reset_index()
-    return cast(Dict[str, int], countries_regions.set_index(by)["legacy_entity_id"])
-
-
 def _get_entities_from_db(countries: Set[str], by: Literal["name", "code"]) -> Dict[str, int]:
     q = f"select id as entity_id, {by} from entities where {by} in %(names)s"
     df = pd.read_sql(q, get_engine(), params={"names": list(countries)})
@@ -220,16 +215,8 @@ def _get_and_create_entities_in_db(countries: Set[str]) -> Dict[str, int]:
     return {name: db.get_or_create_entity(name) for name in countries}
 
 
-def country_code_to_country(country_code: pd.Series) -> pd.Series:
-    """Convert country code to country name."""
-    reference_dataset = catalog.Dataset(REFERENCE_DATASET)
-    code_to_country = reference_dataset["countries_regions"]["name"].to_dict()
-    return cast(pd.Series, dataframes.map_series(country_code, code_to_country, warn_on_missing_mappings=True))
-
-
 def country_to_entity_id(
     country: pd.Series,
-    fill_from_db: bool = True,
     create_entities: bool = False,
     errors: Literal["raise", "ignore", "warn"] = "raise",
     by: Literal["name", "code"] = "name",
@@ -240,23 +227,16 @@ def country_to_entity_id(
     This function should not be used from ETL steps, conversion to entity_id is done automatically
     when upserting to database.
 
-    :param fill_from_db: if True, fill missing countries from `entities` table
     :param create_entities: if True, create missing countries in `entities` table
     :param errors: how to handle missing countries
     :param by: use `name` if you use country names, `code` if you use ISO codes
     """
-    # get entities from countries_regions.csv
-    entity_id = country.map(_get_entities_from_countries_regions(by=by))
-
     # fill entities from DB
-    if entity_id.isnull().any() and fill_from_db:
-        ix = entity_id.isnull()
-        db_entities = _get_entities_from_db(set(country[ix]), by=by)
-        entity_id[ix] = country[ix].map(db_entities).astype(float)
+    db_entities = _get_entities_from_db(set(country), by=by)
+    entity_id = country.map(db_entities).astype(float)
 
     # create entities in DB
     if entity_id.isnull().any() and create_entities:
-        assert fill_from_db, "fill_from_db must be True to create entities"
         assert by == "name", "create_entities works only with `by='name'`"
         ix = entity_id.isnull()
         # cast to float to fix issues with categories
@@ -365,7 +345,11 @@ def _adapt_dataset_metadata_for_grapher(
     # Add the dataset description as if it was a source's description.
     if metadata.description is not None:
         if metadata.sources[0].description:
-            if metadata.sources[0].description != metadata.description:
+            # If descriptions are not subsets of each other (or equal), add them together
+            if (
+                metadata.sources[0].description not in metadata.description
+                and metadata.description not in metadata.sources[0].description
+            ):
                 metadata.sources[0].description = metadata.description + "\n" + metadata.sources[0].description
         else:
             metadata.sources[0].description = metadata.description
@@ -412,8 +396,8 @@ def _adapt_table_for_grapher(
     if table.index.names != [None]:
         table = table.reset_index()
 
-    assert {"year", country_col} <= set(table.columns)
-    assert "entity_id" not in table.columns
+    assert {"year", country_col} <= set(table.columns), f"Table must have columns {country_col} and year."
+    assert "entity_id" not in table.columns, "Table must not have column entity_id."
 
     # Grapher needs a column entity id, that is constructed based on the unique entity names in the database.
     table["entity_id"] = country_to_entity_id(table[country_col], create_entities=True)

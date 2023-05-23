@@ -185,3 +185,68 @@ def calculate_explosives_and_blunt_objects(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     return df
+
+
+def pivot_and_format_df(df, drop_columns, pivot_index, pivot_values, pivot_columns):
+    """
+    - Dropping a selection of columns
+    - Pivoting by the desired disaggregations e.g. category, unit of measurement
+    - Tidying the column names
+    """
+    df = df.drop(columns=drop_columns)
+    df = df.pivot(index=pivot_index, values=pivot_values, columns=pivot_columns)
+    # Make the columns nice
+    df.columns = df.columns.droplevel(0)
+    df.columns = df.columns.map("_".join)
+    df = df.reset_index()
+    return df
+
+
+def create_total_df(df_tot: pd.DataFrame) -> pd.DataFrame:
+    """
+    Create the total homicides dataframe where we will have total homicides/homicide rate
+    disaggregated by age and sex
+    """
+    # To escape the dataframe slice warnings
+    df_tot = df_tot.copy(deep=True)
+    # There are some duplicates when sex is unknown so let's remove those rows
+    df_tot = df_tot[df_tot["sex"] != "Unknown"]
+
+    # Make it more obvious what total age and total sex means
+
+    df_tot["age"] = df_tot["age"].map({"Total": "All ages"}, na_action="ignore").fillna(df_tot["age"])
+    df_tot["sex"] = df_tot["sex"].map({"Total": "Both sexes"}, na_action="ignore").fillna(df_tot["sex"])
+
+    df_tot = pivot_and_format_df(
+        df_tot,
+        drop_columns=["region", "subregion", "indicator", "dimension", "category", "source"],
+        pivot_index=["country", "year"],
+        pivot_values=["value"],
+        pivot_columns=["sex", "age", "unit_of_measurement"],
+    )
+    return df_tot
+
+
+def create_mechanism_df(df_mech: pd.DataFrame) -> pd.DataFrame:
+    """
+    Create the homicides by mechanism dataframe where we will have  homicides/homicide rate
+    disaggregated by mechanism (e.g. weapon)
+    """
+    # df_mech = df_mech.drop(columns=["region", "subregion", "indicator", "dimension", "source", "sex", "age"])
+    df_mech = df_mech.copy(deep=True)
+    df_mech["category"] = (
+        df_mech["category"]
+        .map({"Firearms or explosives - firearms": "Firearms", "Another weapon - sharp object": "Sharp object"})
+        .fillna(df_mech["category"])
+    )
+
+    # Make the table wider so we have a column for each mechanism
+    df_mech = pivot_and_format_df(
+        df_mech,
+        drop_columns=["region", "subregion", "indicator", "dimension", "source", "sex", "age"],
+        pivot_index=["country", "year"],
+        pivot_values=["value"],
+        pivot_columns=["category", "unit_of_measurement"],
+    )
+
+    return df_mech

@@ -13,10 +13,13 @@ from owid.catalog import Dataset, DatasetMeta, LocalCatalog, RemoteCatalog, Tabl
 from owid.catalog.catalogs import CHANNEL, OWID_CATALOG_URI
 from rich.console import Console
 
+from etl import config
 from etl.files import yaml_dump
-from etl.tempcompare import df_equals
+from etl.tempcompare import series_equals
 
 log = structlog.get_logger()
+
+config.enable_bugsnag()
 
 
 class DatasetDiff:
@@ -68,8 +71,24 @@ class DatasetDiff:
             for col in ds_b[table_name].columns:
                 self.p(f"\t\t[green]+ Column [b]{col}[/b]")
         else:
-            table_a = _sort_index(ds_a[table_name]).reset_index()
-            table_b = _sort_index(ds_b[table_name]).reset_index()
+            table_a = ds_a[table_name]
+            table_b = ds_b[table_name]
+
+            # only sort index if different to avoid unnecessary sorting for huge datasets such as ghe
+            if len(table_a) != len(table_b) or not _index_equals(table_a, table_b):
+                index_diff = True
+                table_a = _sort_index(table_a)
+                table_b = _sort_index(table_b)
+
+                # align tables by index
+                table_a, table_b = table_a.align(table_b, join="outer")
+            else:
+                index_diff = False
+
+            # resetting index will make comparison easier
+            dims = table_a.index.names
+            table_a: Table = table_a.reset_index()
+            table_b: Table = table_b.reset_index()
 
             # compare table metadata
             diff = _dict_diff(_table_metadata_dict(table_a), _table_metadata_dict(table_b), tabs=3)
@@ -83,15 +102,6 @@ class DatasetDiff:
 
             # compare columns
             all_cols = sorted(set(table_a.columns) | set(table_b.columns))
-            shared_cols = sorted(set(table_a.columns) & set(table_b.columns))
-
-            if table_a[shared_cols].shape == table_b[shared_cols].shape:
-                # align dataframes by their primary key and compare
-                eq = df_equals(table_a[shared_cols], table_b[shared_cols])
-                data_differs = (~eq).any().to_dict()
-            else:
-                data_differs = {col: False for col in shared_cols}
-
             for col in all_cols:
                 if col not in table_a.columns:
                     self.p(f"\t\t[green]+ Column [b]{col}[/b]")
@@ -100,8 +110,9 @@ class DatasetDiff:
                 else:
                     col_a = table_a[col]
                     col_b = table_b[col]
-                    shape_diff = col_a.shape != col_b.shape
-                    data_diff = data_differs.get(col)
+
+                    eq = series_equals(table_a[col], table_b[col])
+                    data_diff = (~eq).any()
 
                     col_a_meta = col_a.metadata.to_dict()
                     col_b_meta = col_b.metadata.to_dict()
@@ -111,13 +122,18 @@ class DatasetDiff:
                     changed = (
                         (["data"] if data_diff else [])
                         + (["metadata"] if meta_diff else [])
-                        + (["shape"] if shape_diff else [])
+                        + (["index"] if index_diff else [])
                     )
 
                     if changed:
                         self.p(f"\t\t[yellow]~ Column [b]{col}[/b] (changed [u]{' & '.join(changed)}[/u])")
                         if self.verbose and meta_diff:
                             self.p(_dict_diff(col_a_meta, col_b_meta, tabs=4))
+                        if self.verbose:
+                            if data_diff or index_diff:
+                                out = _data_diff(table_a, table_b, col, dims, tabs=4, eq=eq)
+                                if out:
+                                    self.p(out)
                     else:
                         # do not print identical columns
                         pass
@@ -243,7 +259,9 @@ def cli(
             any_diff = True
 
     console.print()
-    if any_diff:
+    if not path_to_ds_a and not path_to_ds_b:
+        console.print("[yellow]❓ No datasets found[/yellow]")
+    elif any_diff:
         console.print("[red]❌ Found differences[/red]")
     else:
         console.print("[green]✅ No differences found[/green]")
@@ -256,9 +274,21 @@ def cli(
         "[b]Hint[/b]: Run this locally with [cyan][b]etl-datadiff REMOTE data/ --include yourdataset --verbose[/b][/cyan]"
     )
     console.print(
-        "[b]Hint[/b]: Get detailed comparison with [cyan][b]compare --show-values channel namespace version short_name --data-values[/b][/cyan]"
+        "[b]Hint[/b]: Get detailed comparison with [cyan][b]compare --show-values channel namespace version short_name --values[/b][/cyan]"
     )
     exit(1 if any_diff else 0)
+
+
+def _index_equals(table_a: pd.DataFrame, table_b: pd.DataFrame, sample: int = 1000) -> bool:
+    """Check if two tables have the same index. Sample both tables to speed up the check."""
+    if len(table_a) < sample and len(table_b) < sample:
+        index_a = table_a.index
+        index_b = table_b.index
+    else:
+        index_a = table_a.sample(sample, random_state=0).index
+        index_b = table_b.sample(sample, random_state=0).index
+
+    return (index_a == index_b).all()  # type: ignore
 
 
 def _dict_diff(dict_a: Dict[str, Any], dict_b: Dict[str, Any], tabs) -> str:
@@ -278,6 +308,49 @@ def _dict_diff(dict_a: Dict[str, Any], dict_b: Dict[str, Any], tabs) -> str:
     else:
         # add tabs
         return "\t" * tabs + "".join(lines).replace("\n", "\n" + "\t" * tabs).rstrip()
+
+
+def _data_diff(
+    table_a: Table, table_b: Table, col: str, dims: list[str], tabs: int, eq: Optional[pd.Series] = None
+) -> str:
+    """Return summary of data differences."""
+    if eq is None:
+        eq = series_equals(table_a[col], table_b[col])
+
+    lines = [
+        f"- Changed values: {(~eq).sum()} / {len(eq)} ({(~eq).sum() / len(eq) * 100:.2f}%)",
+    ]
+
+    # changes in index
+    for dim in dims:
+        diff_elements = table_a.loc[~eq, dim].dropna().astype(str).sort_values().unique().tolist()
+        detail = f"{len(diff_elements)} affected" if len(diff_elements) > 5 else ", ".join(diff_elements)
+        lines.append(f"- {dim}: {detail}")
+
+    # changes in values
+    if table_a[col].dtype == "category":
+        vals_a = set(table_a.loc[~eq, col].dropna())
+        vals_b = set(table_b.loc[~eq, col].dropna())
+        if vals_a - vals_b:
+            lines.append(f"- Removed values: {', '.join(vals_a - vals_b)}")
+        if vals_b - vals_a:
+            lines.append(f"- New values: {', '.join(vals_b - vals_a)}")
+    else:
+        mean_a = table_a.loc[~eq, col].mean()
+        mean_b = table_b.loc[~eq, col].mean()
+        abs_diff = mean_b - mean_a
+        rel_diff = abs_diff / 0.5 / (mean_a + mean_b)
+
+        lines.append(f"- Avg. change: {abs_diff:.2f} ({rel_diff:.0%})")
+
+    # add color
+    lines = ["[violet]" + line for line in lines]
+
+    if not lines:
+        return ""
+    else:
+        # add tabs
+        return "\t" * tabs + "\n".join(lines).replace("\n", "\n" + "\t" * tabs).rstrip()
 
 
 def _sort_index(df: Table) -> Table:
@@ -351,7 +424,7 @@ def _dataset_metadata_dict(ds: Dataset) -> Dict[str, Any]:
     if "sources" in d:
         d["sources"] = sorted(d["sources"], key=lambda x: x["name"])
 
-    del d["source_checksum"]
+    d.pop("source_checksum", None)
     return d
 
 
@@ -385,6 +458,10 @@ def _remote_catalog_datasets(channels: Iterable[CHANNEL], include: str, exclude:
     frame = rc.frame
 
     frame["ds_paths"] = frame["path"].map(os.path.dirname)
+
+    # only compare public datasets
+    frame = frame[frame.is_public]
+
     ds_paths = frame["ds_paths"]
 
     if include:

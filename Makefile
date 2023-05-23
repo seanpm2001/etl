@@ -107,11 +107,15 @@ grapher: .venv
 
 dot: dependencies.pdf
 
-dependencies.pdf: .venv dag.yml etl/to_graphviz.py
-	poetry run python etl/to_graphviz.py dependencies.dot
+dependencies.pdf: .venv dag/main.yml etl/to_graphviz.py
+	poetry run generate_graph dependencies.dot
 	dot -Tpdf dependencies.dot >$@.tmp
 	mv -f $@.tmp $@
 
 deploy:
 	@echo '==> Rebuilding the production ETL from origin/master'
 	ssh -t owid@analytics.owid.io /home/owid/analytics/ops/scripts/etl-prod.sh
+
+version-tracker: .venv
+	@echo '==> Check that no archive dataset is used by an active dataset, and that all active datasets are used'
+	poetry run version_tracker
