@@ -32,10 +32,6 @@ dataset:
 tables:
   unwto:
     variables:
-      index:
-        title: index
-        short_unit: ''
-        unit: ''
       in_to_ar_ov_vi_to:
         title: Inbound arrivals (tourists)
         unit: ''
@@ -326,9 +322,9 @@ tables:
         short_unit: ''
       inb_outb_tour:
         title: Inbound/Outbound (tourists)
-        short_unit: ''
+        short_unit: 'ratio'
         unit: ''
       inb_outb_tot:
-        title: Inbound/Outbound (total)
-        short_unit: ''
+        title:  Inbound/Outbound (total)
+        short_unit: 'ratio'
         unit: ''

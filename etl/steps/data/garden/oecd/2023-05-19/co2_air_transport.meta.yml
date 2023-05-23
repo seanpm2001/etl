@@ -63,7 +63,7 @@ tables:
       int_inb_out:
         title: Annual CO2 Emissions from International Aviation by Inbound/Outbound
           ratio
-        unit: ''
+        unit: 'ratio'
         short_unit: ''
       ter_dom_m:
         title: Monthly CO2 Emissions from Domestic Aviation

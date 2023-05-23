@@ -21,14 +21,13 @@ def run(dest_dir: str) -> None:
     # Load meadow dataset.
     ds_meadow: Dataset = paths.load_dependency("co2_air_transport")
     ds_tour: Dataset = paths.load_dependency("unwto")
+    month_names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
     # Read table from meadow dataset.
     tb_meadow = ds_meadow["co2_air_transport"]
     tb_tour = ds_tour["unwto"]
-
-    # Create a dataframe with data from the table.
-    df = pd.DataFrame(tb_meadow)
-    df_tr = pd.DataFrame(tb_tour)
+    df = pd.DataFrame(tb_meadow)  # Create a dataframe with data from the co2 transport table.
+    df_tr = pd.DataFrame(tb_tour) # Create a dataframe with data from the tourism table.
 
     #
     # Process data.
@@ -41,60 +40,23 @@ def run(dest_dir: str) -> None:
     df = df[df['flight_type'] == 'P']
     df.drop('flight_type', axis = 1, inplace = True)
     df = df[df['emission_source'].isin(['TER_DOM', 'TER_INT'])]
-    df = df.reset_index(drop=True)
+    df = df.reset_index(drop = True)
 
-    df_an = df[df['frequency'] == 'Annual']
-    df_an = df_an.drop(['frequency', 'month'], axis = 1)
+    pivot_table_ye = preprocess_dataframe_anual_data(df)
 
-
-    df_an['emission_source'] = df_an['emission_source'].apply(lambda x: x + '_a')
-    df_an.set_index(['country', 'year', 'emission_source'], inplace = True)
-
-    assert df_an.index.is_unique, "Index is not well constructed"
-    df_an.reset_index(inplace = True)
-
-    pivot_table_ye = pd.pivot_table(df_an, values='value', index=['country', 'year'], columns=['emission_source'])
-    pivot_table_ye.reset_index(inplace = True)
     # Add population data to the DataFrame
     pivot_table_ye = geo.add_population_to_dataframe(pivot_table_ye, country_col="country", year_col="year", population_col="population")
     emissions_columns = pivot_table_ye.columns[2:-1]
 
     for col in emissions_columns:
         pivot_table_ye[f'per_capita_{col}'] = pivot_table_ye[col] / pivot_table_ye['population']
-    just_inb_ratio = df_tr[['country', 'year','inb_outb_tot']]
 
-    pivot_outb = pd.merge(pivot_table_ye, just_inb_ratio, on = ['year', 'country'])
-    pivot_outb = pd.merge(pivot_table_ye, just_inb_ratio, on = ['year', 'country'])
-    pivot_outb['int_inb_out'] = pivot_outb['TER_INT_a']*pivot_outb['inb_outb_tot']
-    pivot_outb = pivot_outb.drop(['inb_outb_tot'], axis = 1)
+    pivot_outb = add_inbound_outbound_tour(pivot_table_ye, df_tr)
+    pivot_df, pivot_table_mn = process_monthly_data(df, month_names)
 
-    df_mn = df[df['frequency'] == 'Monthly']
-    df_mn = df_mn.drop(['frequency'], axis = 1)
-    # Create a new 'date' column separately
-    date_column = pd.to_datetime(df_mn['year'].astype(str) + '-' + df_mn['month'].astype(str) + '-15')
-
-    # Assign the 'date' column to the DataFrame
-    df_mn['date'] = date_column
-    df_mn['emission_source'] = df_mn['emission_source'].apply(lambda x: x + '_m')
-
-    # Split by month
-    pivot_df = pd.pivot_table(df_mn[df_mn['emission_source']=='TER_INT_m'], values='value', index=['country', 'year'], columns='month')
-    # Define a list of month names
-    pivot_df.reset_index(inplace = True)
-    month_names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-    # Rename the columns with month names
-    pivot_df.columns = ['country', 'year'] + month_names
-
-    df_mn['days_since_2019'] = (df_mn['date'] - pd.to_datetime('2019-01-01')).dt.days
-    df_mn.drop(['month','year', 'date'], axis = 1, inplace = True)
-
-    df_mn.rename(columns={'days_since_2019': 'year'}, inplace=True)
-
-    pivot_table_mn = pd.pivot_table(df_mn, values = 'value', index = ['country', 'year'], columns = ['emission_source'])
-
-    pivot_table_mn.reset_index(inplace = True)
-    concatenated_df = pd.merge(pivot_outb, pivot_table_mn,on = ['year', 'country'], how = 'outer')
+    concatenated_df = pd.merge(pivot_outb, pivot_table_mn, on = ['year', 'country'], how = 'outer')
     merge_df = pd.merge(concatenated_df, pivot_df, on = ['year', 'country'], how = 'outer')
+
     merge_df = ukraine_fill_war_for_reg_agg(merge_df)
     merge_df = merge_df.drop('TER_INT_m', axis = 1)
 
@@ -186,7 +148,6 @@ def ukraine_fill_war_for_reg_agg(df):
 
 
 def update_values(row):
-
     regions_ = ["North America", "South America", "Europe",  "Africa",  "Asia", "Oceania"]
     month_names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
@@ -196,3 +157,59 @@ def update_values(row):
     else:
         row[month_names] = float('nan')  # Set values to NaN for month columns starting from the 3rd column
         return row
+
+
+def preprocess_dataframe_anual_data(df):
+    """
+    Function to preprocess a dataframe based on specific conditions.
+
+    Parameters:
+    df (pandas.DataFrame): The dataframe to be preprocessed.
+
+    Returns:
+    pandas.DataFrame: The preprocessed dataframe.
+    """
+
+    df_an = df[df['frequency'] == 'Annual']
+    df_an = df_an.drop(['frequency', 'month'], axis = 1)
+
+    df_an['emission_source'] = df_an['emission_source'].apply(lambda x: x + '_a')
+    df_an.set_index(['country', 'year', 'emission_source'], inplace = True)
+
+    assert df_an.index.is_unique, "Index is not well constructed"
+    df_an.reset_index(inplace = True)
+
+    pivot_table_ye = pd.pivot_table(df_an, values='value', index=['country', 'year'], columns=['emission_source'])
+    pivot_table_ye.reset_index(inplace = True)
+
+    return pivot_table_ye
+
+def process_monthly_data(df, month_names):
+    df_mn = df[df['frequency'] == 'Monthly']
+    df_mn = df_mn.drop(['frequency'], axis=1)
+
+    date_column = pd.to_datetime(df_mn['year'].astype(str) + '-' + df_mn['month'].astype(str) + '-15')
+    df_mn['date'] = date_column
+    df_mn['emission_source'] = df_mn['emission_source'].apply(lambda x: x + '_m')
+
+    pivot_df = pd.pivot_table(df_mn[df_mn['emission_source'] == 'TER_INT_m'], values='value', index=['country', 'year'], columns='month')
+    pivot_df.reset_index(inplace=True)
+
+    pivot_df.columns = ['country', 'year'] + month_names
+
+    df_mn['days_since_2019'] = (df_mn['date'] - pd.to_datetime('2019-01-01')).dt.days
+    df_mn.drop(['month', 'year', 'date'], axis=1, inplace=True)
+    df_mn.rename(columns={'days_since_2019': 'year'}, inplace=True)
+
+    pivot_table_mn = pd.pivot_table(df_mn, values='value', index=['country', 'year'], columns=['emission_source'])
+    pivot_table_mn.reset_index(inplace=True)
+
+    return pivot_df, pivot_table_mn
+
+
+def add_inbound_outbound_tour(df, df_tr):
+    just_inb_ratio = df_tr[['country', 'year','inb_outb_tour']]
+    df = pd.merge(df, just_inb_ratio, on = ['year', 'country'])
+    df['int_inb_out'] = df['TER_INT_a']*df['inb_outb_tour']
+    df = df.drop(['inb_outb_tour'], axis = 1)
+    return df

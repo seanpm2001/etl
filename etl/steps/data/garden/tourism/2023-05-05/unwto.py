@@ -31,8 +31,7 @@ def run(dest_dir: str) -> None:
     #
     log.info("unwto.harmonize_countries")
     df = geo.harmonize_countries(
-        df=df, countries_file=paths.country_mapping_path, excluded_countries_file=paths.excluded_countries_path
-    )
+        df = df, countries_file=paths.country_mapping_path, excluded_countries_file=paths.excluded_countries_path)
 
     # Set multi-level index and check that index is unique
     df.set_index(['country', 'year'], inplace=True)
@@ -106,7 +105,6 @@ def run(dest_dir: str) -> None:
     print("Dropped columns:", dropped_columns)
     print("Number of remaining columns:", len(merged_df_concat_transf.columns))
 
-
     # Multiply by a thousand columns that have a unit thousands
     cols_unit_not_thousands = ['to_in_av_ca_be_pl_pe_10_in', 'to_in_av_le_of_st', 'to_in_nu_of_be_pl', 'to_in_nu_of_es', 'to_in_nu_of_ro', 'to_in_oc_ra_be_pl', 'to_in_oc_ra_ro', 'in_to_ex_pa_tr', 'in_to_ex_tr', 'ou_to_ex_pa_tr', 'ou_to_ex_tr', 'population']
 
@@ -133,6 +131,7 @@ def run(dest_dir: str) -> None:
 
     # Create a new table with the processed data.
     tb_garden = Table(merged_df_concat_transf, short_name = 'unwto')
+
     # Save outputs.
     #
     # Create a new garden dataset with the same metadata as the meadow dataset.
