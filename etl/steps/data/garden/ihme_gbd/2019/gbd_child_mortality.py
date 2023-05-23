@@ -12,7 +12,7 @@ def run(dest_dir: str) -> None:
 
     # Name the dimensions we are keeping and pivoting by - this varies for gbd_risk
     dims = ["sex", "age", "cause"]
-
+    columns = ["measure"]
     # Get dataset level variables
 
     dataset = N.short_name
@@ -22,5 +22,5 @@ def run(dest_dir: str) -> None:
     metadata_path = N.directory / f"{dataset}.meta.yml"
 
     # Run the function to produce garden dataset
-    run_wrapper(dataset, country_mapping_path, excluded_countries_path, dest_dir, metadata_path, dims)
+    run_wrapper(dataset, country_mapping_path, excluded_countries_path, dest_dir, metadata_path, dims, columns)
     log.info(f"{dataset}.end")

@@ -9,25 +9,33 @@ tables:
     variables:
       dalys__disability_adjusted_life_years__rate:
         title: DALYs (rate)
+        description: The number of DALYs from a cause, per 100,000 people
         unit: DALYs per 100,000 people
       dalys__disability_adjusted_life_years__number:
         title: DALYs (number)
+        description: The number of DALYs from a cause
         unit: DALYs
       dalys__disability_adjusted_life_years__percent:
         title: DALYs (percent)
+        description: The number of DALYs from a cause, as a proportion of total DALYs in a year
         unit: "%"
       dalys__disability_adjusted_life_years__share_of_the_population:
         title: DALYs (share of the population)
+        description: The number of DALYs from a cause, per 100 people
         unit: DALYs per 100 people
       deaths__number:
         title: Deaths (number)
+        description: The number of deaths from a cause
         unit: deaths
       deaths__rate:
         title: Deaths (rate)
+        description: The number of deaths from a cause, per 100,000 people
         unit: deaths per 100,000 people
       deaths__percent:
         title: Deaths (percent)
+        description: The number of deaths from a cause, as a proportion of total deaths in a year
         unit: "%"
       deaths__share_of_the_population:
-        title: Deaths per 100 people
+        title: Deaths (share of the population)
+        description: The number of deaths from a cause, per 100 people
         unit: "%"

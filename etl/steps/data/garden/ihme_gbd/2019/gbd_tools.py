@@ -57,42 +57,46 @@ def prepare_garden(df: pd.DataFrame) -> Table:
     return tb_garden
 
 
-def _pivot_number(df: pd.DataFrame, dims: List[str]) -> Any:
-    df_number = df[df.metric == "Number"].pivot(index=["country", "year"] + dims, columns="measure", values="value")
-    df_number = df_number.rename(columns=lambda c: c + " - Number")
+def _pivot_number(df: pd.DataFrame, dims: List[str], columns: List[str]) -> Any:
+    df_number = df[df.metric == "Number"].pivot(index=["country", "year"] + dims, columns=columns, values="value")
+    df_number.columns = [" - ".join(col).strip() for col in df_number.columns.values]
     return df_number
 
 
-def _pivot_percent(df: pd.DataFrame, dims: List[str]) -> Any:
-    df_percent = df[df.metric == "Percent"].pivot(index=["country", "year"] + dims, columns="measure", values="value")
-    df_percent = df_percent.rename(columns=lambda c: c + " - Percent")
+def _pivot_percent(df: pd.DataFrame, dims: List[str], columns: List[str]) -> Any:
+    df_percent = df[df.metric == "Percent"].pivot(index=["country", "year"] + dims, columns=columns, values="value")
+    # df_percent = df_percent.rename(columns=lambda c: c + " - Percent")
+    df_percent.columns = [" - ".join(col).strip() for col in df_percent.columns.values]
     return df_percent
 
 
-def _pivot_rate(df: pd.DataFrame, dims: List[str]) -> Any:
-    df_rate = df[df.metric == "Rate"].pivot(index=["country", "year"] + dims, columns="measure", values="value")
-    df_rate = df_rate.rename(columns=lambda c: c + " - Rate")
+def _pivot_rate(df: pd.DataFrame, dims: List[str], columns: List[str]) -> Any:
+    df_rate = df[df.metric == "Rate"].pivot(index=["country", "year"] + dims, columns=columns, values="value")
+    df_rate.columns = [" - ".join(col).strip() for col in df_rate.columns.values]
     return df_rate
 
 
-def _pivot_share(df: pd.DataFrame, dims: List[str]) -> Any:
+def _pivot_share(df: pd.DataFrame, dims: List[str], columns: List[str]) -> Any:
     df_share = df[df.metric == "Share of the population"].pivot(
-        index=["country", "year"] + dims, columns="measure", values="value"
+        index=["country", "year"] + dims, columns=columns, values="value"
     )
-    df_share = df_share.rename(columns=lambda c: c + " - Share of the population")
+    df_share.columns = [" - ".join(col).strip() for col in df_share.columns.values]
     return df_share
 
 
-def pivot(df: pd.DataFrame, dims: List[str]) -> Table:
+def pivot(df: pd.DataFrame, dims: List[str], columns: List[str], dataset: str) -> Table:
     # NOTE: processing them separately simplifies the code and is faster (and less memory heavy) than
     # doing it all in one pivot operation
-    df_number = _pivot_number(df, dims)
-    df_percent = _pivot_percent(df, dims)
-    df_rate = _pivot_rate(df, dims)
-    df_share = _pivot_share(df, dims)
+    df_number = _pivot_number(df, dims, columns)
+    df_percent = _pivot_percent(df, dims, columns)
+    df_rate = _pivot_rate(df, dims, columns)
+    df_share = _pivot_share(df, dims, columns)
 
     tb_garden = Table(pd.concat([df_number, df_percent, df_rate, df_share], axis=1))
-    tb_garden = underscore_table(tb_garden)
+    if dataset == "gbd_mental_health":
+        tb_garden = tb_garden
+    else:
+        tb_garden = underscore_table(tb_garden)
 
     return tb_garden
 
@@ -159,6 +163,7 @@ def run_wrapper(
     dest_dir: str,
     metadata_path: Path,
     dims: List[str],
+    columns: List[str],
 ) -> None:
     # read dataset from meadow
     ds_meadow = Dataset(DATA_DIR / f"meadow/ihme_gbd/2019/{dataset}")
@@ -172,7 +177,7 @@ def run_wrapper(
     omm = omm_metrics(df_garden)
     df_garden = cast(pd.DataFrame, pd.concat([df_garden, omm], axis=0))
     df_garden = add_share_of_population(df_garden)
-    tb_garden = pivot(df_garden, dims)
+    tb_garden = pivot(df_garden, dims, columns, dataset)
 
     # free up memory
     del df_garden
