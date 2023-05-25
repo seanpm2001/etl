@@ -74,7 +74,7 @@ def clean_data(df: pd.DataFrame) -> list[Table]:
     Splitting the data into four dataframes/tables based on the dimension columns:
     * Total
     * by mechanism
-    * by relationship to perpertrator
+    * by relationship to perpetrator
     * by situational context
     """
     df["age"] = df["age"].map({"Total": "All ages"}, na_action="ignore").fillna(df["age"])
@@ -182,14 +182,14 @@ def build_metadata(col: tuple, table_name: str) -> VariableMeta:
     if table_name == "by mechanisms":
         title = f"{metric_dict[col[0]]['title']} - {col[1]}"
         description = (
-            f"The {metric_dict[col[0]]['title'].lower()}, where the homicide was carried out using {col[1].lower()}."
+            f"The {metric_dict[col[0]]['title'].lower()}, where the homicide was carried out {col[1].lower()}."
         )
     elif table_name == "Total":
         title = f"{metric_dict[col[0]]['title']} - {col[1]} - {col[2]}"
         description = f"The {metric_dict[col[0]]['title'].lower()} recorded in a year."
     elif table_name == "by relationship to perpetrator":
         title = f"{metric_dict[col[0]]['title']} - {col[1]} - {col[2]} - {col[3]}"
-        description = f"The {metric_dict[col[0]]['title'].lower()} shown by the victims relationship to the perpertrator. The age and sex characteristics relate to that of the victim, rather than the perpertrator."
+        description = f"The {metric_dict[col[0]]['title'].lower()} shown by the victims relationship to the perpetrator. The age and sex characteristics relate to that of the victim, rather than the perpertrator."
     elif table_name == "by situational context":
         title = f"{metric_dict[col[0]]['title']} - {col[1]} - {col[2]} - {col[3]}"
         description = f"The {metric_dict[col[0]]['title'].lower()} shown by the situational context of the homicide."
@@ -214,18 +214,18 @@ def clean_up_categories(df: pd.DataFrame) -> pd.DataFrame:
 
     """
     category_dict = {
-        "Firearms or explosives - firearms": "firearms",
-        "Another weapon - sharp object": "a sharp object",
-        "Unspecified means": "unspecified means",
+        "Firearms or explosives - firearms": "with firearms",
+        "Another weapon - sharp object": "with a sharp object",
+        "Unspecified means": "with unspecified means",
         "Without a weapon/ other Mechanism": " without a weapon or by another mechanism",
-        "Firearms or explosives": "firearms or explosives",
-        "Another weapon": "sharp or blunt object, including motor vehicles",
-        "Intimate partner or family member": "Perpertrator is an intimate partner or family member",
-        "Intimate partner or family member: Intimate partner": "Perpertrator is an intimate partner",
-        "Intimate partner or family member: Family member": "Perpertrator is a family member",
+        "Firearms or explosives": "with firearms or explosives",
+        "Another weapon": "with a sharp or blunt object, including motor vehicles",
+        "Intimate partner or family member": "Perpetrator is an intimate partner or family member",
+        "Intimate partner or family member: Intimate partner": "Perpetrator is an intimate partner",
+        "Intimate partner or family member: Family member": "Perpetrator is a family member",
         "Other Perpetrator known to the victim": "Another known perpetrator",
-        "Perpetrator unknown": "Perpertrator is unknown",
-        "Relationship to perpetrator is not known": "Perpertrator where the relationship to the victim is not known",
+        "Perpetrator unknown": "Perpetrator is unknown",
+        "Relationship to perpetrator is not known": "Perpetrator where the relationship to the victim is not known",
         "Socio-political homicide - terrorist offences": "Terrorist offences",
         "Unknown types of homicide": "Unknown situational context",
     }
@@ -239,22 +239,22 @@ def calculate_share_of_homicides(total_table: Table, perp_table: Table) -> Table
     """
     Calculate the share of total homicides where:
 
-    * The perpertrator is an intimate partner
-    * The perpertrator is a family member
-    * The perpertrator is unknown
+    * The perpetrator is an intimate partner
+    * The perpetrator is a family member
+    * The perpetrator is unknown
     """
     merge_table = pd.merge(total_table, perp_table, on=["country", "year"])
 
     sexes = ["both_sexes", "female", "male"]
-    perpertrators = [
-        "perpertrator_is_an_intimate_partner",
-        "perpertrator_is_a_family_member",
-        "perpertrator_is_unknown",
+    perpetrators = [
+        "perpetrator_is_an_intimate_partner",
+        "perpetrator_is_a_family_member",
+        "perpetrator_is_unknown",
     ]
     share_df = pd.DataFrame()
     for sex in sexes:
         sex_select = f"counts_{sex}_all_ages"
-        for perp in perpertrators:
+        for perp in perpetrators:
             perp_select = f"counts_{perp}_{sex}_all_ages"
             new_col = underscore(f"Share of homicides of {sex} where the {perp}")
             share_df[new_col] = (merge_table[perp_select] / merge_table[sex_select]) * 100
