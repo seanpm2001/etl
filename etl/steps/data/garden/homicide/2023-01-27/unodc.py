@@ -242,6 +242,8 @@ def calculate_share_of_homicides(total_table: Table, perp_table: Table) -> Table
     * The perpetrator is an intimate partner
     * The perpetrator is a family member
     * The perpetrator is unknown
+
+    Remove values where the % is over 100
     """
     merge_table = pd.merge(total_table, perp_table, on=["country", "year"])
 
@@ -259,5 +261,7 @@ def calculate_share_of_homicides(total_table: Table, perp_table: Table) -> Table
             new_col = underscore(f"Share of homicides of {sex} where the {perp}")
             share_df[new_col] = (merge_table[perp_select] / merge_table[sex_select]) * 100
             share_df[new_col] = share_df[new_col].replace(np.inf, np.nan)
+            share_df[new_col][share_df[new_col] > 100] = np.nan
+
     share_table = Table(share_df, short_name="share")
     return share_table
