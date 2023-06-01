@@ -213,8 +213,6 @@ def _load_values(engine: Engine, variable_ids: list[int]) -> pd.DataFrame:
     """
     df: pd.DataFrame = pd.read_sql(q, engine, params={"variable_ids": variable_ids})
 
-    __import__("ipdb").set_trace()
-
     # If df is empty, then data_values don't exist. This shouldn't be happening becase
     # we don't backport ETL datasets (that don't have data_values), but there's an
     # exception for SDG dataset that might backport ETL datasets.
