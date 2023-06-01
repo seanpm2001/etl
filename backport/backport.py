@@ -57,7 +57,6 @@ def backport_cli(
 
 
 class PotentialBackport:
-
     dataset_id: int
     ds: gm.Dataset
     config: GrapherConfig
@@ -213,6 +212,8 @@ def _load_values(engine: Engine, variable_ids: list[int]) -> pd.DataFrame:
     where d.variableId in %(variable_ids)s
     """
     df: pd.DataFrame = pd.read_sql(q, engine, params={"variable_ids": variable_ids})
+
+    __import__("ipdb").set_trace()
 
     # If df is empty, then data_values don't exist. This shouldn't be happening becase
     # we don't backport ETL datasets (that don't have data_values), but there's an
