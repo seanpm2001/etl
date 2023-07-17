@@ -91,6 +91,14 @@ def run(dest_dir: str) -> None:
     # Add data for "all intrastate" conflict types
     tb = add_conflict_all_intrastate(tb)
 
+    # Add zeroes to extra-systemic
+    log.info("Set zeroes to all metrics after 1989 for `conflict_type=extrasystemic`")
+    tb = add_zeroes_for_extra_after_1989(tb)
+
+    tb.loc[
+        (tb["year"] >= 1989) & (tb["conflict_type"] == "extrasystemic"),
+        ["number_ongoing_conflicts", "number_new_conflicts"],
+    ] = 0
     # Force types
     # tb = tb.astype({"conflict_type": "category", "region": "category"})
 
@@ -234,6 +242,19 @@ def add_conflict_type(tb_geo: Table, tb_conflict: Table) -> Table:
     # Sanity check
     assert tb_geo["conflict_type"].isna().sum() == 0, "Check NaNs in conflict_type (i.e. conflicts without a type)!"
     return tb_geo
+
+
+def add_zeroes_for_extra_after_1989(tb: Table) -> Table:
+    """Create new dataframe with values for extrasystemic conflicts after 1989."""
+    columns_idx = ["year", "region", "conflict_type"]
+    tb_extrasystemic = tb[(tb["year"] > 1989) & (tb["conflict_type"] == "intrastate")].copy()
+    tb_extrasystemic["conflict_type"] = "extrasystemic"
+    tb_extrasystemic[[col for col in tb_extrasystemic.columns if col not in columns_idx]] = np.nan
+    tb_extrasystemic[["number_ongoing_conflicts", "number_new_conflicts"]] = 0
+
+    # Combine
+    tb = pd.concat([tb, tb_extrasystemic], ignore_index=True)
+    return tb
 
 
 def _sanity_check_conflict_types(tb: Table) -> Table:

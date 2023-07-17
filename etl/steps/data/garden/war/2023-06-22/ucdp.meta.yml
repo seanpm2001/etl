@@ -55,7 +55,7 @@ tables:
 
       number_ongoing_conflicts:
         title: Number of ongoing conflicts
-        unit: deaths
+        unit: conflicts
         description: >-
           Number of ongoing (active) conflicts in a given year.
 
@@ -67,7 +67,7 @@ tables:
           numDecimalPlaces: 0
       number_new_conflicts:
         title: Number of new conflicts
-        unit: deaths
+        unit: conflicts
         description: >-
           Number of new (active) conflicts in a given year.
 
