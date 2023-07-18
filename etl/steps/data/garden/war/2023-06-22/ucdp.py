@@ -78,7 +78,7 @@ def run(dest_dir: str) -> None:
     # Fill NaNs
     log.info("ucdp: replace missing data with zeros (where applicable)")
     tb_prio = replace_missing_data_with_zeros(tb_prio)
-    tb = replace_missing_data_with_zeros(tb)
+    tb = replace_missing_data_with_zeros(tb, num_deahts=True)
 
     # Combine main dataset with PRIO/UCDP
     log.info("ucdp: add data from ucdp/prio table")
@@ -92,13 +92,9 @@ def run(dest_dir: str) -> None:
     tb = add_conflict_all_intrastate(tb)
 
     # Add zeroes to extra-systemic
-    log.info("Set zeroes to all metrics after 1989 for `conflict_type=extrasystemic`")
+    log.info("ucdp: set zeroes to all metrics after 1989 for `conflict_type=extrasystemic`")
     tb = add_zeroes_for_extra_after_1989(tb)
 
-    tb.loc[
-        (tb["year"] >= 1989) & (tb["conflict_type"] == "extrasystemic"),
-        ["number_ongoing_conflicts", "number_new_conflicts"],
-    ] = 0
     # Force types
     # tb = tb.astype({"conflict_type": "category", "region": "category"})
 
@@ -247,13 +243,16 @@ def add_conflict_type(tb_geo: Table, tb_conflict: Table) -> Table:
 def add_zeroes_for_extra_after_1989(tb: Table) -> Table:
     """Create new dataframe with values for extrasystemic conflicts after 1989."""
     columns_idx = ["year", "region", "conflict_type"]
-    tb_extrasystemic = tb[(tb["year"] > 1989) & (tb["conflict_type"] == "intrastate")].copy()
+    tb_extrasystemic = tb[(tb["year"] >= 1989) & (tb["conflict_type"] == "intrastate")].copy()
     tb_extrasystemic["conflict_type"] = "extrasystemic"
     tb_extrasystemic[[col for col in tb_extrasystemic.columns if col not in columns_idx]] = np.nan
     tb_extrasystemic[["number_ongoing_conflicts", "number_new_conflicts"]] = 0
 
     # Combine
     tb = pd.concat([tb, tb_extrasystemic], ignore_index=True)
+
+    # Drop duplicates
+    tb = tb.drop_duplicates(subset=columns_idx)
     return tb
 
 
@@ -291,7 +290,7 @@ def _sanity_check_prio_conflict_types(tb: Table) -> Table:
     assert not transitions_unk, f"Unknown transitions found: {transitions_unk}"
 
 
-def replace_missing_data_with_zeros(tb: Table) -> Table:
+def replace_missing_data_with_zeros(tb: Table, num_deahts: bool = False) -> Table:
     """Replace missing data with zeros.
 
     In some instances (e.g. extrasystemic conflicts after ~1964) there is missing data. Instead, we'd like this to be zero-valued.
@@ -307,6 +306,8 @@ def replace_missing_data_with_zeros(tb: Table) -> Table:
     ## Change NaNs for 0 for specific rows
     ## For columns "number_ongoing_conflicts", "number_new_conflicts"; conflict_type="extrasystemic"
     columns = ["number_ongoing_conflicts", "number_new_conflicts"]
+    if num_deahts:
+        columns += ["number_deaths_ongoing_conflicts", "number_deaths_ongoing_conflicts_high", "number_deaths_ongoing_conflicts_low"]
     tb.loc[:, columns] = tb.loc[:, columns].fillna(0)
 
     return tb
@@ -343,11 +344,12 @@ def add_number_conflicts_and_deaths(tb: Table) -> Table:
 
 
 def _add_number_ongoing_conflicts_and_deaths(tb: Table) -> Table:
+    ops = {"best": "sum", "high": "sum", "low": "sum", "conflict_new_id": "nunique"}
     # For each region
     columns_idx = ["year", "region", "conflict_type"]
     tb_ongoing = (
         tb.groupby(columns_idx)
-        .agg({"best": "sum", "high": "sum", "low": "sum", "conflict_new_id": "nunique"})
+        .agg(ops)
         .reset_index()
     )
     tb_ongoing.columns = columns_idx + [
@@ -360,7 +362,7 @@ def _add_number_ongoing_conflicts_and_deaths(tb: Table) -> Table:
     columns_idx = ["year", "conflict_type"]
     tb_ongoing_world = (
         tb.groupby(columns_idx)
-        .agg({"best": "sum", "high": "sum", "low": "sum", "conflict_new_id": "nunique"})
+        .agg(ops)
         .reset_index()
     )
     tb_ongoing_world.columns = columns_idx + [
