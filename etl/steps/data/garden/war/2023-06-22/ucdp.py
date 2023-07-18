@@ -307,7 +307,11 @@ def replace_missing_data_with_zeros(tb: Table, num_deahts: bool = False) -> Tabl
     ## For columns "number_ongoing_conflicts", "number_new_conflicts"; conflict_type="extrasystemic"
     columns = ["number_ongoing_conflicts", "number_new_conflicts"]
     if num_deahts:
-        columns += ["number_deaths_ongoing_conflicts", "number_deaths_ongoing_conflicts_high", "number_deaths_ongoing_conflicts_low"]
+        columns += [
+            "number_deaths_ongoing_conflicts",
+            "number_deaths_ongoing_conflicts_high",
+            "number_deaths_ongoing_conflicts_low",
+        ]
     tb.loc[:, columns] = tb.loc[:, columns].fillna(0)
 
     return tb
@@ -347,11 +351,7 @@ def _add_number_ongoing_conflicts_and_deaths(tb: Table) -> Table:
     ops = {"best": "sum", "high": "sum", "low": "sum", "conflict_new_id": "nunique"}
     # For each region
     columns_idx = ["year", "region", "conflict_type"]
-    tb_ongoing = (
-        tb.groupby(columns_idx)
-        .agg(ops)
-        .reset_index()
-    )
+    tb_ongoing = tb.groupby(columns_idx).agg(ops).reset_index()
     tb_ongoing.columns = columns_idx + [
         "number_deaths_ongoing_conflicts",
         "number_deaths_ongoing_conflicts_high",
@@ -360,11 +360,7 @@ def _add_number_ongoing_conflicts_and_deaths(tb: Table) -> Table:
     ]
     # For the World
     columns_idx = ["year", "conflict_type"]
-    tb_ongoing_world = (
-        tb.groupby(columns_idx)
-        .agg(ops)
-        .reset_index()
-    )
+    tb_ongoing_world = tb.groupby(columns_idx).agg(ops).reset_index()
     tb_ongoing_world.columns = columns_idx + [
         "number_deaths_ongoing_conflicts",
         "number_deaths_ongoing_conflicts_high",
