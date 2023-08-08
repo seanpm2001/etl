@@ -12,7 +12,10 @@ should probably be moved to owid-datautils. However this can be time consuming a
 """
 from typing import Any, List, Set, Union
 
+import numpy as np
 import pandas as pd
+import statsmodels.api as sm
+from statsmodels.gam.api import BSplines, GLMGam
 
 
 def check_known_columns(df: pd.DataFrame, known_cols: list) -> None:
@@ -43,3 +46,19 @@ def check_values_in_column(df: pd.DataFrame, column_name: str, values_expected: 
         raise ValueError(
             f"Values {values_missing} in column `{column_name}` missing, check if they were removed from source!"
         )
+
+
+def add_cubic_spline(df: pd.DataFrame, time_col: str, var_col: str) -> pd.DataFrame:
+    """
+    Add cubic spline interpolation of a given variable to a dataframe.
+    """
+    gam_model = LinearGAM(s(0))  # 's(0)' specifies the cubic spline basis for the first feature
+    gam_model.fit(df[time_col], df[var_col])
+
+    new_X = np.linspace(0, 10, 100)
+    predictions = gam_model.predict(new_X)
+
+    # Create spline basis with automatic knot selection
+    bs = BSplines(X, degree=[3])  # Degree 3 for cubic spline
+    gam_model = GLMGam(y, X, smoother=bs)
+    result = gam_model.fit()
