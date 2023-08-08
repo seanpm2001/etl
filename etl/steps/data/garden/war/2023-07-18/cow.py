@@ -810,7 +810,7 @@ def _get_new_metrics(tb: Table) -> Table:
     tb_new_world_alltypes["region"] = "World"
     tb_new_world_alltypes["conflict_type"] = "all"
 
-    # World and conflict_type='all'
+    # World and conflict_type='intra-state'
     tb_new_world_intra = tb_intra.groupby(["year_start"], as_index=False).agg(ops)
     tb_new_world_intra["region"] = "World"
     tb_new_world_intra["conflict_type"] = "intra-state"

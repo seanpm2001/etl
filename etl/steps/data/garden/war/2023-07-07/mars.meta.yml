@@ -41,7 +41,7 @@ tables:
           The sum across all regions can therefore be higher than the total number of ongoing wars.
 
 
-          For the wars that had campaigns within it that were a civil war and a non-civil war, we coded them as non-civil wars.
+          For the wars that had campaigns that were classified as civil war and a non-civil war, we coded them as non-civil wars.
 
         display:
           numDecimalPlaces: 0
