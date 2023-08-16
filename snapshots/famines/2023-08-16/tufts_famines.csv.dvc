@@ -1,0 +1,22 @@
+meta:
+  name: Famine Trends (World Peace Foundation)
+  source_name: World Peace Foundation
+  source_published_by: World Peace Foundation, Graduate School of Global Affairs at
+    Tufts University
+  url: https://sites.tufts.edu/wpf/famine/
+  source_data_url: https://sites.tufts.edu/wpf/famine/
+  license_url: ''
+  license_name: ''
+  date_accessed: 2023-08-16
+  is_public: true
+  description: |
+    The Famine Trends dataset includes two kinds of overlapping events, which have hitherto largely been studied separately. First, are great and catastrophic famines. A famine is defined as a food crisis that causes elevated mortality over a specific period of time. Using the criteria developed by Stephen Devereux (Devereux 2000) for ‘great famines’ (100,000 or more excess deaths) and ‘catastrophic famines’ (one million or more excess deaths), it includes any famine for which the upper estimate of excess deaths falls above 100,000.
+
+    Second, using the four-point scale for ‘famine crimes’ developed by David Marcus (2003), the dataset also includes episodes of mass intentional starvation. For these events, the threshold is 10,000 deaths by starvation for inclusion in the listing. However, only events of mass intentional starvation that caused over 100,000 deaths are included in the quantitative dataset, on which the graphs are based.
+
+    There are major methodological issues with the estimation of excess mortality. Generally speaking, better demographic calculations lead to lower estimations of excess deaths than those provided by journalists and other contemporary observers. We might therefore reasonably expect an upward bias in the figures for earlier famines on the record. On the other hand, contemporary definitions of famine (e.g. Howe and Devereux 2004) provide thresholds for nutrition and mortality that correspond with normal or near-normal conditions in many historic societies (see Ó Gráda 2015, pp. 174-5).
+wdir: ../../../data/snapshots/famines/2023-08-16
+outs:
+- md5: dc5274c4db595de1bb89b5d7e391374a
+  size: 5414
+  path: tufts_famines.csv

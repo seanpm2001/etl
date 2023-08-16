@@ -354,6 +354,10 @@
   name: "China"
   aliases:
     - "China, mainland"
+    - "China (NW – Gansu, Shaanxi, Shanxi, Henan, Shandong and Zhili (Hebei))"
+    - "China (NW – Gansu, Shaanxi, Shanxi, Henan, Shandong and Zhili (Hebei))"
+    - "China (Shanxi, Henan, Shandong, Zhili, and Shaanxi)"
+    - "China (Sichuan)"
   related:
     - "HKG"
     - "MAC"
@@ -1324,6 +1328,8 @@
 
 - code: "ZAF"
   name: "South Africa"
+  aliases:
+    - "S Africa[1]"
 
 - code: "OWID_SAM"
   name: "South America"
