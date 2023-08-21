@@ -1,0 +1,20 @@
+{
+  "short_name": "all_causes__both_sexes__all_ages",
+  "description": "UN WPP dataset by OWID. Contains only metrics corresponding to sub-group mortality.",
+  "primary_key": [],
+  "fields": {
+    "country": {},
+    "year": {},
+    "total_deaths_that_are_from_all_causes__in_both_sexes_aged_all_ages": {
+      "title": "Total deaths that are from all causes, in both sexes aged all ages",
+      "description": "All Causes has the following ICD 10 codes: A00-Y89.",
+      "unit": "deaths",
+      "short_unit": "",
+      "display": {
+        "name": "Total deaths that are from all causes, in both sexes aged all ages",
+        "numDecimalPlaces": 0
+      }
+    },
+    "total_estimated_deaths": {}
+  }
+}
