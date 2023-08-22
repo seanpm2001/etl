@@ -10,8 +10,7 @@ import streamlit as st
 from streamlit_ace import st_ace
 
 import etl.grapher_model as gm
-from etl import paths
-from etl import config
+from etl import config, paths
 
 ###################################################
 # Initial configuration ###########################

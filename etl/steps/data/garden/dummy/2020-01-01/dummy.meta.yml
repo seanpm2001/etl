@@ -29,8 +29,6 @@ tables:
             subtitle: You'll never guess where the line will go
             hasMapTab: true
             selectedEntityNames:
-            - Germany
-            - Italy
             - France
           title_public: The dummy indicator - data page title
           title_variant: historical data
