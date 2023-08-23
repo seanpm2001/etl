@@ -90,7 +90,7 @@ def load_indicators_from_db() -> pd.DataFrame:
 URL_METADATA = "https://www.notion.so/owid/Metadata-guidelines-29ca6e19b6f1409ea6826a88dbb18bcc"
 
 # Select table
-df = load_indicators_from_db()
+# df = load_indicators_from_db()
 # table_uri = st.selectbox('Select table', df["catalog_path"].unique(), index=0)
 
 # Define columns
