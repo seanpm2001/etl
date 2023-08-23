@@ -6,11 +6,15 @@ import subprocess
 import webbrowser
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
+from sqlalchemy.sql.operators import is_not
+from sqlmodel import Session, select
 from streamlit_ace import st_ace
 
 import etl.grapher_model as gm
 from etl import config, paths
+from etl.grapher_model import get_engine
 
 ###################################################
 # Initial configuration ###########################
@@ -52,7 +56,7 @@ def run_steps() -> None:
 
 
 def get_data_page_url() -> str:
-    """Get data page URL"""
+    """Get data page URL."""
     HOST = config.DB_HOST
     VARIABLE_ID = gm.Variable.load_from_catalog_path(CATALOG_PATH).id
     if HOST in ["localhost", "127.0.0.1"]:
@@ -70,10 +74,24 @@ def reset_metadata_files():
         f.write(METADATA_GARDEN_BASE)
 
 
+@st.cache
+def load_indicators_from_db() -> pd.DataFrame:
+    """Load indicators from DB."""
+    with Session(get_engine()) as ses:
+        stmt = select(gm.Variable).where(is_not(gm.Variable.catalogPath, None))
+        results = ses.exec(stmt).all()
+        df = pd.DataFrame([(r.catalogPath, r.shortName) for r in results], columns=["catalog_path", "short_name"])
+    return df
+
+
 ###################################################
 # Show header #####################################
 ###################################################
 URL_METADATA = "https://www.notion.so/owid/Metadata-guidelines-29ca6e19b6f1409ea6826a88dbb18bcc"
+
+# Select table
+df = load_indicators_from_db()
+# table_uri = st.selectbox('Select table', df["catalog_path"].unique(), index=0)
 
 # Define columns
 col1, col2 = st.columns(2)
