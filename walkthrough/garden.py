@@ -22,11 +22,8 @@ ETL_DIR = Path(etl.__file__).parent.parent
 
 
 class Options(Enum):
-    ADD_TO_DAG = "Add steps into dag.yml file"
     INCLUDE_METADATA_YAML = "Include *.meta.yaml file with metadata"
     GENERATE_NOTEBOOK = "Generate playground notebook"
-    LOAD_COUNTRIES_REGIONS = "Load countries regions in the script"
-    LOAD_POPULATION = "Load population in the script"
     IS_PRIVATE = "Make dataset private"
 
 
@@ -36,18 +33,16 @@ class GardenForm(BaseModel):
     version: str
     meadow_version: str
     add_to_dag: bool
-    load_countries_regions: bool
-    load_population: bool
+    dag_file: str
     include_metadata_yaml: bool
     generate_notebook: bool
     is_private: bool
 
     def __init__(self, **data: Any) -> None:
         options = data.pop("options")
-        data["add_to_dag"] = Options.ADD_TO_DAG.value in options
+        data["add_to_dag"] = data["dag_file"] != utils.ADD_DAG_OPTIONS[0]
+        data["dag_file"] = data["dag_file"]
         data["include_metadata_yaml"] = Options.INCLUDE_METADATA_YAML.value in options
-        data["load_countries_regions"] = Options.LOAD_COUNTRIES_REGIONS.value in options
-        data["load_population"] = Options.LOAD_POPULATION.value in options
         data["generate_notebook"] = Options.GENERATE_NOTEBOOK.value in options
         data["is_private"] = Options.IS_PRIVATE.value in options
         super().__init__(**data)
@@ -96,19 +91,16 @@ def app(run_checks: bool) -> None:
                 value=state.get("version", str(dt.date.today())),
                 help_text="Version of the meadow dataset (by default, the current date, or exceptionally the publication date).",
             ),
+            pi.select("Add to DAG", utils.ADD_DAG_OPTIONS, name="dag_file", value=state.get("dag_file")),
             pi.checkbox(
                 "Additional Options",
                 options=[
-                    Options.ADD_TO_DAG.value,
                     Options.INCLUDE_METADATA_YAML.value,
                     Options.GENERATE_NOTEBOOK.value,
-                    Options.LOAD_COUNTRIES_REGIONS.value,
-                    Options.LOAD_POPULATION.value,
                     Options.IS_PRIVATE.value,
                 ],
                 name="options",
                 value=[
-                    Options.ADD_TO_DAG.value,
                     Options.INCLUDE_METADATA_YAML.value,
                     Options.GENERATE_NOTEBOOK.value,
                 ],
@@ -127,12 +119,9 @@ def app(run_checks: bool) -> None:
 
     if form.add_to_dag:
         deps = [f"data{private_suffix}://meadow/{form.namespace}/{form.meadow_version}/{form.short_name}"]
-        if form.load_population:
-            deps.append(utils.DATASET_POPULATION_URI)
-        if form.load_countries_regions:
-            deps.append(utils.DATASET_REGIONS_URI)
         dag_content = utils.add_to_dag(
-            {f"data{private_suffix}://garden/{form.namespace}/{form.version}/{form.short_name}": deps}
+            dag={f"data{private_suffix}://garden/{form.namespace}/{form.version}/{form.short_name}": deps},
+            dag_path=CURRENT_DIR / ".." / "dag" / form.dag_file,
         )
     else:
         dag_content = ""
@@ -161,7 +150,7 @@ def app(run_checks: bool) -> None:
 1. Harmonize country names with the following command (assuming country field is called `country`). Check out a [short demo](https://drive.google.com/file/d/1tBFMkgOgy4MmB7E7NmfMlfa4noWaiG3t/view) of the tool
 
     ```
-    poetry run harmonize data/meadow/{form.namespace}/{form.meadow_version}/{form.short_name}/{form.short_name}.feather country etl/steps/data/garden/{form.namespace}/{form.version}/{form.short_name}.countries.json
+    poetry run etl-harmonize data/meadow/{form.namespace}/{form.meadow_version}/{form.short_name}/{form.short_name}.feather country etl/steps/data/garden/{form.namespace}/{form.version}/{form.short_name}.countries.json
     ```
 
     you can also add more countries manually there or to `{form.short_name}.country_excluded.json` file.
@@ -220,7 +209,7 @@ def app(run_checks: bool) -> None:
     utils.preview_file(step_path, "python")
 
     if dag_content:
-        utils.preview_dag(dag_content)
+        utils.preview_dag(dag_content=dag_content, dag_name=f"`dag/{form.dag_file}`")
 
 
 def _check_dataset_in_meadow(form: GardenForm) -> None:
@@ -292,7 +281,7 @@ def _fill_dummy_metadata_yaml(metadata_path: Path) -> None:
 
         doc["tables"]["dummy"]["variables"] = {"dummy_variable": variable_meta}
     else:
-        doc["tables"]["dummy"]["variables"] = {"dummy_variable": {"unit": "dummy unit"}}
+        doc["tables"]["dummy"]["variables"] = {"dummy_variable": {"unit": "dummy unit", "title": "Dummy"}}
 
     with open(metadata_path, "w") as f:
         ruamel.yaml.dump(doc, f, Dumper=ruamel.yaml.RoundTripDumper)

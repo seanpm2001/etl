@@ -16,6 +16,8 @@ from owid import catalog
 from owid.catalog import CHANNEL, DatasetMeta, Table
 from owid.catalog.datasets import DEFAULT_FORMATS, FileFormat
 from owid.catalog.tables import (
+    combine_tables_description,
+    combine_tables_title,
     get_unique_licenses_from_tables,
     get_unique_origins_from_tables,
     get_unique_sources_from_tables,
@@ -98,6 +100,7 @@ def create_dataset(
     camel_to_snake: bool = False,
     formats: List[FileFormat] = DEFAULT_FORMATS,
     check_variables_metadata: bool = False,
+    run_grapher_checks: bool = True,
 ) -> catalog.Dataset:
     """Create a dataset and add a list of tables. The dataset metadata is inferred from
     default_metadata and the dest_dir (which is in the form `channel/namespace/version/short_name`).
@@ -113,6 +116,7 @@ def create_dataset(
     :param underscore_table: Whether to underscore the table name before adding it to the dataset.
     :param camel_to_snake: Whether to convert camel case to snake case for the table name.
     :param check_variables_metadata: Check that all variables in tables have metadata; raise a warning otherwise.
+    :param run_grapher_checks: Run grapher checks on the dataset, only applies to grapher channel.
 
     Usage:
         ds = create_dataset(dest_dir, [table_a, table_b], default_metadata=snap.metadata)
@@ -121,17 +125,21 @@ def create_dataset(
     from etl.steps.data.converters import convert_snapshot_metadata
 
     if default_metadata is None:
+        # Get titles and descriptions from the tables.
+        # Note: If there are different titles or description, the result will be None.
+        title = combine_tables_title(tables=tables)
+        description = combine_tables_description(tables=tables)
         # If not defined, gather origins and licenses from the metadata of the tables.
         licenses = get_unique_licenses_from_tables(tables=tables)
         if any(["origins" in table[column].metadata.to_dict() for table in tables for column in table.columns]):
             # If any of the variables contains "origins" this means that it is a recently created dataset.
             # Gather origins from all variables in all tables.
             origins = get_unique_origins_from_tables(tables=tables)
-            default_metadata = DatasetMeta(licenses=licenses, origins=origins)
+            default_metadata = DatasetMeta(licenses=licenses, origins=origins, title=title, description=description)
         else:
             # None of the variables includes "origins", which means it is an old dataset, with "sources".
             sources = get_unique_sources_from_tables(tables=tables)
-            default_metadata = DatasetMeta(licenses=licenses, sources=sources)
+            default_metadata = DatasetMeta(licenses=licenses, sources=sources, title=title, description=description)
     elif isinstance(default_metadata, SnapshotMeta):
         # convert snapshot SnapshotMeta to DatasetMeta
         default_metadata = convert_snapshot_metadata(default_metadata)
@@ -176,6 +184,10 @@ def create_dataset(
         # check that we are not using metadata inconsistent with path
         for k, v in match.groupdict().items():
             assert str(getattr(ds.metadata, k)) == v, f"Metadata {k} is inconsistent with path {dest_dir}"
+
+    # run grapher checks
+    if ds.metadata.channel == "grapher" and run_grapher_checks:
+        grapher_checks(ds)
 
     return ds
 
@@ -543,15 +555,15 @@ class PathFinder:
 
         return dataset
 
-    def load_snapshot_dependency(self) -> Snapshot:
-        """Load snapshot dependency with the same name."""
-        snap = self.load_dependency(channel="snapshot", short_name=self.short_name)
+    def load_snapshot(self, short_name: Optional[str] = None) -> Snapshot:
+        """Load snapshot dependency. short_name defaults to the current step's short_name."""
+        snap = self.load_dependency(channel="snapshot", short_name=short_name or self.short_name)
         assert isinstance(snap, Snapshot)
         return snap
 
-    def load_dataset_dependency(self) -> catalog.Dataset:
-        """Load dataset dependency with the same name."""
-        dataset = self.load_dependency(short_name=self.short_name)
+    def load_dataset(self, short_name: Optional[str] = None) -> catalog.Dataset:
+        """Load dataset dependency. short_name defaults to the current step's short_name."""
+        dataset = self.load_dependency(short_name=short_name or self.short_name)
         assert isinstance(dataset, catalog.Dataset)
         return dataset
 
