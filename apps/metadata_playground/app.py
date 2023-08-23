@@ -55,6 +55,8 @@ def get_data_page_url() -> str:
     """Get data page URL"""
     HOST = config.DB_HOST
     VARIABLE_ID = gm.Variable.load_from_catalog_path(CATALOG_PATH).id
+    if HOST in ["localhost", "127.0.0.1"]:
+        HOST = f"{HOST}:3030"
     url = f"http://{HOST}/admin/datapage-preview/{VARIABLE_ID}"
     return url
 
