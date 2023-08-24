@@ -1,4 +1,13 @@
-"""Load a meadow dataset and create a garden dataset."""
+"""The data is given by triplets:
+
+    - war code
+    - campaign code
+    - country code
+
+All metrics (number of deaths, place of fight) are given at the triplet level. This makes assigning deaths to regions very easy.
+
+We distribute deaths uniformly across the years of the triplet.
+"""
 
 from typing import cast
 

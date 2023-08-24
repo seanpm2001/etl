@@ -214,7 +214,7 @@ def add_conflict_type(tb_geo: Table, tb_conflict: Table) -> Table:
 
     The thing is that the original table `tb_geo` only contains a very high level categorisation. In particular,
     it labels all state-based conflicts as 'state-based'. Instead, we want to use a more fine grained definition:
-    extrasystemic, intrastate, interstate.
+    extrasystemic, intrastate, interstate. This later information is available in Battle-related conflict dataset.
 
     Parameters
     ----------
@@ -233,6 +233,7 @@ def add_conflict_type(tb_geo: Table, tb_conflict: Table) -> Table:
     )
     # Fill unknown types of violence
     mask = tb_geo["type_of_violence"] == 1  # these are state-based conflicts
+    assert tb_geo.loc[mask, "type_of_conflict"].notna().all(), "There are some NaNs in type_of_conflict!"
     tb_geo.loc[mask, "type_of_conflict"] = tb_geo.loc[mask, "type_of_conflict"].fillna("state-based (unknown)")
 
     # Assert that `type_of_conflict` was only added for state-based events
