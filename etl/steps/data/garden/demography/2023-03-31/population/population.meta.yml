@@ -105,7 +105,7 @@ tables:
   population_original: *population_table
 
 
-collapsed_origin:
+origin_combined:
   dataset_title_owid: Population (various sources)
   dataset_description_owid: *dataset-description
   producer: Gapminder, HYDE, UN Population Division

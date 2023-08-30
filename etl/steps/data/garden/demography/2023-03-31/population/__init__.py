@@ -57,7 +57,7 @@ def run(dest_dir: str) -> None:
 
     # set collapsed origin for population table
     with open(paths.metadata_path, "r") as file:
-        origin = Origin(**yaml.safe_load(file)["collapsed_origin"])
+        origin = Origin(**yaml.safe_load(file)["origin_combined"])
     for col in tb.columns:
         tb[col].metadata.origins = [origin]
 
