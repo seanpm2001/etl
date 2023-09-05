@@ -5,6 +5,7 @@
 import copy
 import json
 import os
+import random
 from collections import defaultdict
 from typing import Any, Dict, List, Literal, Optional, Union, cast, overload
 
@@ -23,6 +24,11 @@ from .meta import (
     VariablePresentationMeta,
 )
 from .properties import metadata_property
+
+
+def random_hash():
+    return random.randint(0, int(1e10))
+
 
 log = structlog.get_logger()
 
@@ -77,16 +83,23 @@ class Variable(pd.Series):
         self,
         data: Any = None,
         index: Any = None,
+        name: Optional[str] = None,
         _fields: Optional[Dict[str, VariableMeta]] = None,
+        metadata: Optional[VariableMeta] = None,
         **kwargs: Any,
     ) -> None:
+        if metadata:
+            assert not _fields, "cannot pass both metadata and _fields"
+            assert name or self.name, "cannot pass metadata without a name"
+            _fields = {(name or self.name): metadata}  # type: ignore
+
         self._fields = _fields or defaultdict(VariableMeta)
 
         # silence warning
         if data is None and not kwargs.get("dtype"):
             kwargs["dtype"] = "object"
 
-        super().__init__(data=data, index=index, **kwargs)
+        super().__init__(data=data, index=index, name=name, **kwargs)
 
     @property
     def name(self) -> Optional[str]:
@@ -489,14 +502,10 @@ def combine_variables_metadata(
     metadata.presentation = combine_variables_presentation(variables=variables_only)
     metadata.processing_level = combine_variables_processing_level(variables=variables_only)
 
-    # List names of variables and scalars (or other objects passed in variables).
-    variables_and_scalars_names = [
-        variable.name if hasattr(variable, "name") else str(variable) for variable in variables
-    ]
     metadata.processing_log = add_entry_to_processing_log(
         processing_log=metadata.processing_log,
         variable_name=name,
-        parents=variables_and_scalars_names,
+        parents=variables,
         operation=operation,
     )
 
@@ -508,6 +517,7 @@ def add_entry_to_processing_log(
     variable_name: str,
     parents: List[Any],
     operation: str,
+    target: Optional[str] = None,
     comment: Optional[str] = None,
 ) -> List[Any]:
     if not PROCESSING_LOG:
@@ -520,8 +530,32 @@ def add_entry_to_processing_log(
     # TODO: Parents currently can be anything. Here we should ensure that they are strings. For example, we could
     # extract the name of the parent if it is a variable.
 
+    # List names of variables and scalars (or other objects passed in variables).
+    new_parents = []
+    for parent in parents:
+        if isinstance(parent, Variable):
+            parent = parent.metadata
+
+        if isinstance(parent, VariableMeta):
+            if len(parent.processing_log) == 0:
+                new_parents.append(variable_name)
+            else:
+                new_parents.append(parent.processing_log[-1]["target"])
+        elif hasattr(parent, "name"):
+            new_parents.append(parent.name)
+        else:
+            new_parents.append(str(parent))
+
+    if not target:
+        target = f"{variable_name}#{random_hash()}"
+
     # Define new log entry.
-    log_new_entry = {"variable": variable_name, "parents": parents, "operation": operation}
+    log_new_entry = {
+        "variable": variable_name,
+        "parents": new_parents,
+        "operation": operation,
+        "target": target,
+    }
     if comment is not None:
         log_new_entry["comment"] = comment
 

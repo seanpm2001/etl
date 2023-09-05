@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from . import tables, utils
+from . import tables, utils, variables
 from .meta import SOURCE_EXISTS_OPTIONS, DatasetMeta, TableMeta
 from .properties import metadata_property
 
@@ -178,10 +178,13 @@ class Dataset:
         self.metadata.save(self._index_file)
 
         # Update the copy of this datasets metadata in every table in the set.
-        for table_name in self.table_names:
-            table = self[table_name]
-            table.metadata.dataset = self.metadata
-            table._save_metadata(join(self.path, table.metadata.checked_name + ".meta.json"))
+        # TODO: disable processing log
+        # this entire part should go away and we should make t.metadata.dataset read only
+        with utils.set_var(variables, "PROCESSING_LOG", ""):
+            for table_name in self.table_names:
+                table = self[table_name]
+                table.metadata.dataset = self.metadata
+                table._save_metadata(join(self.path, table.metadata.checked_name + ".meta.json"))
 
     def update_metadata(self, metadata_path: Path, if_source_exists: SOURCE_EXISTS_OPTIONS = "replace") -> None:
         """
@@ -199,7 +202,8 @@ class Dataset:
         with open(metadata_path) as istream:
             metadata = yaml.safe_load(istream)
             for table_name in metadata.get("tables", {}).keys():
-                table = self[table_name]
+                with utils.set_var(variables, "PROCESSING_LOG", ""):
+                    table = self[table_name]
                 table.update_metadata_from_yaml(metadata_path, table_name)
                 table._save_metadata(join(self.path, table.metadata.checked_name + ".meta.json"))
 

@@ -1,5 +1,6 @@
 import datetime as dt
 import re
+from contextlib import contextmanager
 from pathlib import Path
 from typing import List, Literal, Optional, Union, overload
 
@@ -243,3 +244,13 @@ def dynamic_yaml_load(path: Union[Path, str], params: dict = {}) -> dict:
     yd["TODAY"] = dt.datetime.now().astimezone(pytz.timezone("Europe/London")).strftime("%-d %B %Y")
 
     return yd
+
+
+@contextmanager
+def set_var(module, variable_name, value):
+    original_value = getattr(module, variable_name)
+    setattr(module, variable_name, value)
+    try:
+        yield
+    finally:
+        setattr(module, variable_name, original_value)

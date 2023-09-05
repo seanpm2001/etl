@@ -157,7 +157,6 @@ class Table(pd.DataFrame):
             raise ValueError(f"could not detect a suitable format to read from: {path}")
 
         # Add processing log to the metadata of each variable in the table.
-        # TODO: For some reason, the snapshot loading entry gets repeated.
         table = update_processing_logs_when_loading_or_creating_table(table=table)
 
         return table
@@ -385,9 +384,7 @@ class Table(pd.DataFrame):
                     # stating that the variable has changed name (from the old to the current one).
                     last_variable_name = value.metadata.processing_log[-1]["variable"]
                     if last_variable_name != key:
-                        value.update_log(
-                            parents=[last_variable_name], operation="rename", variable_name=key, inplace=True
-                        )
+                        value.update_log(parents=[value.metadata], operation="rename", variable_name=key, inplace=True)
             else:
                 self._fields[key] = VariableMeta()
 
@@ -427,7 +424,7 @@ class Table(pd.DataFrame):
                 fields[new_col].processing_log = variables.add_entry_to_processing_log(
                     processing_log=fields[new_col].processing_log,
                     variable_name=new_col,
-                    parents=[old_col],
+                    parents=[self._fields[old_col]],
                     operation="rename",
                 )
 
@@ -1067,10 +1064,11 @@ def read_csv(
 ) -> Table:
     table = Table(pd.read_csv(filepath_or_buffer=filepath_or_buffer, *args, **kwargs), underscore=underscore)
     table = _add_table_and_variables_metadata_to_table(table=table, metadata=metadata)
-    if isinstance(filepath_or_buffer, (str, Path)):
-        table = update_log(table=table, operation="load", parents=[filepath_or_buffer])
-    else:
-        log.warning("Currently, the processing log cannot be updated unless you pass a path to read_csv.")
+    # NOTE: log is updated already in _add_table_and_variables_metadata_to_table
+    # if isinstance(filepath_or_buffer, (str, Path)):
+    #     table = update_log(table=table, operation="load-snapshot", parents=[filepath_or_buffer])
+    # else:
+    #     log.warning("Currently, the processing log cannot be updated unless you pass a path to read_csv.")
 
     return cast(Table, table)
 
@@ -1084,7 +1082,8 @@ def read_feather(
 ) -> Table:
     table = Table(pd.read_feather(filepath, *args, **kwargs), underscore=underscore)
     table = _add_table_and_variables_metadata_to_table(table=table, metadata=metadata)
-    table = update_log(table=table, operation="load", parents=[filepath])
+    # NOTE: log is updated already in _add_table_and_variables_metadata_to_table
+    # table = update_log(table=table, operation="load-snapshot", parents=[filepath])
 
     return cast(Table, table)
 
@@ -1095,7 +1094,8 @@ def read_excel(
     table = Table(pd.read_excel(io=io, *args, **kwargs), underscore=underscore)
     table = _add_table_and_variables_metadata_to_table(table=table, metadata=metadata)
     # Note: Maybe we should include the sheet name in parents.
-    table = update_log(table=table, operation="load", parents=[io], inplace=False)
+    # NOTE: log is updated already in _add_table_and_variables_metadata_to_table
+    # table = update_log(table=table, operation="load-snapshot", parents=[io], inplace=False)
 
     return cast(Table, table)
 
@@ -1104,7 +1104,8 @@ def read_from_records(data: Any, *args, metadata: Optional[TableMeta] = None, un
     table = Table(pd.DataFrame.from_records(data=data, *args, **kwargs), underscore=underscore)
     table = _add_table_and_variables_metadata_to_table(table=table, metadata=metadata)
     # NOTE: Parents could be passed as arguments, or extracted from metadata.
-    table = update_log(table=table, operation="load", parents=["local_data"], inplace=False)
+    # NOTE: log is updated already in _add_table_and_variables_metadata_to_table
+    # table = update_log(table=table, operation="load-snapshot", parents=["local_data"], inplace=False)
 
     return table
 
@@ -1115,7 +1116,8 @@ def read_from_dict(
     table = Table(pd.DataFrame.from_dict(data=data, *args, **kwargs), underscore=underscore)
     table = _add_table_and_variables_metadata_to_table(table=table, metadata=metadata)
     # NOTE: Parents could be passed as arguments, or extracted from metadata.
-    table = update_log(table=table, operation="load", parents=["local_data"], inplace=False)
+    # NOTE: log is updated already in _add_table_and_variables_metadata_to_table
+    # table = update_log(table=table, operation="load-snapshot", parents=["local_data"], inplace=False)
 
     return table
 
@@ -1129,10 +1131,11 @@ def read_json(
 ) -> Table:
     table = Table(pd.read_json(path_or_buf=path_or_buf, *args, **kwargs), underscore=underscore)
     table = _add_table_and_variables_metadata_to_table(table=table, metadata=metadata)
-    if isinstance(path_or_buf, (str, Path)):
-        table = update_log(table=table, operation="load", parents=[path_or_buf])
-    else:
-        log.warning("Currently, the processing log cannot be updated unless you pass a path to read_json.")
+    # NOTE: log is updated already in _add_table_and_variables_metadata_to_table
+    # if isinstance(path_or_buf, (str, Path)):
+    #     table = update_log(table=table, operation="load-snapshot", parents=[path_or_buf])
+    # else:
+    #     log.warning("Currently, the processing log cannot be updated unless you pass a path to read_json.")
 
     return cast(Table, table)
 
@@ -1151,14 +1154,18 @@ class ExcelFile(pd.ExcelFile):
         table = Table(df, underscore=underscore, short_name=str(sheet_name))
         if metadata is not None:
             table = _add_table_and_variables_metadata_to_table(table=table, metadata=metadata)
+        # NOTE: log is updated already in _add_table_and_variables_metadata_to_table
         # Note: Maybe we should include the sheet name in parents.
-        table = update_log(table=table, operation="load", parents=[self.io], inplace=False)
+        # table = update_log(table=table, operation="load-snapshot", parents=[self.io], inplace=False)
 
         return table
 
 
 def update_processing_logs_when_loading_or_creating_table(table: Table) -> Table:
     # Add entry to processing log, specifying that each variable was loaded from this table.
+    if not variables.PROCESSING_LOG:
+        return table
+
     try:
         # If the table comes from an ETL dataset, generate a URI for the table.
         table_uri = f"{table.metadata.dataset.uri}/{table.metadata.short_name}"  # type: ignore
@@ -1180,7 +1187,20 @@ def update_processing_logs_when_saving_table(table: Table, path: Union[str, Path
     # error, as long as path is a Path.
     path = Path(path)
     uri = "/".join(path.absolute().parts[-5:-1] + tuple([path.stem]))
-    table = _add_processing_log_entry_to_each_variable(table=table, parents=[uri], operation="save")
+
+    # Add a processing log entry to each column, including index columns.
+    for column in list(table.all_columns):
+        log_new_entry = {
+            "target": uri,
+            "parents": [table._fields[column]],
+            "operation": "save",
+            "variable_name": column,
+        }
+
+        # NOTE: table[column].metadata.processing_log.add_entry would be easier to work with
+        table._fields[column].processing_log = variables.add_entry_to_processing_log(
+            processing_log=table._fields[column].processing_log, **log_new_entry
+        )
 
     return table
 
@@ -1195,14 +1215,16 @@ def _add_processing_log_entry_to_each_variable(
         # the entry has the field "variable" (for simplicity).
         log_new_entry = {"variable_name": column, "parents": parents, "operation": operation}
 
-        if log_new_entry not in table._fields[column].processing_log:
-            # If the processing log is not empty but the last entry is identical to the one we want to insert, skip, to
-            # avoid storing the same entry multiple times.
-            # This happens for example when saving tables, given that tables are stored in different formats.
-            # Otherwise, append a new entry to the processing log.
-            table._fields[column].processing_log = variables.add_entry_to_processing_log(
-                processing_log=table._fields[column].processing_log, **log_new_entry
-            )
+        table._fields[column].processing_log = variables.add_entry_to_processing_log(
+            processing_log=table._fields[column].processing_log, **log_new_entry
+        )
+
+        # NOTE: this doesn't work well if dict has nested fields, e.g. `parents`
+        # if log_new_entry not in table._fields[column].processing_log:
+        #     # If the processing log is not empty but the last entry is identical to the one we want to insert, skip, to
+        #     # avoid storing the same entry multiple times.
+        #     # This happens for example when saving tables, given that tables are stored in different formats.
+        #     # Otherwise, append a new entry to the processing log.
 
     return table
 

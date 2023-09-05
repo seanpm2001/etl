@@ -16,6 +16,24 @@ def run(dest_dir: str) -> None:
     # Load data from snapshot.
     tb = snap.read()
 
+    tb["dummy_variable"] += 1
+
+    tb["yummy_variable"] = tb["dummy_variable"] * 2
+
+    # tb2 = tb.copy().rename(columns={"dummy_variable": "yummy_variable"})
+    # tb2["yummy_variable"] += 1
+
+    # tb["yummy_variable"] = tb["dummy_variable"].copy()
+
+    # tb["yummy_variable"] += 1
+
+    tb["out"] = tb["dummy_variable"] + tb["yummy_variable"]
+
+    # print(tb.dummy_variable.metadata.processing_log)
+    # print("pp tb.dummy_variable.metadata.processing_log")
+
+    # tb["out"] = tb["dummy_variable"] + tb["yummy_variable"]
+
     #
     # Process data.
     #
