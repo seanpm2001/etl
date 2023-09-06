@@ -2,7 +2,7 @@ import datetime as dt
 import re
 from contextlib import contextmanager
 from pathlib import Path
-from typing import List, Literal, Optional, Union, overload
+from typing import Literal, Optional, Union, overload
 
 import dynamic_yaml
 import numpy as np
@@ -11,7 +11,6 @@ import pytz
 from unidecode import unidecode
 
 from .tables import Table
-from .variables import Variable
 
 
 @overload
@@ -173,6 +172,8 @@ def _resolve_collisions(
     return new_cols
 
 
+# TODO: this should be Table's method, not a function, `utils` should not depend
+# on tables.py
 def underscore_table(
     t: Table,
     collision: Literal["raise", "rename", "ignore"] = "raise",
@@ -223,15 +224,6 @@ def validate_underscore(name: Optional[str], object_name: str = "Name") -> None:
     """Raise error if name is not snake_case."""
     if name is not None and not re.match("^[a-z_][a-z0-9_]*$", name):
         raise NameError(f"{object_name} must be snake_case. Change `{name}` to `{underscore(name, validate=False)}`")
-
-
-def concat_variables(variables: List[Variable]) -> Table:
-    """Concatenate variables into a single table keeping all metadata."""
-    t = Table(pd.concat(variables, axis=1))
-    for v in variables:
-        if v.name:
-            t._fields[v.name] = v.metadata
-    return t
 
 
 def dynamic_yaml_load(path: Union[Path, str], params: dict = {}) -> dict:
