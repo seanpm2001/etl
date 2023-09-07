@@ -9,7 +9,6 @@ from typing import Any, Dict, List, Optional, TypeVar, Union, cast
 import numpy as np
 import pandas as pd
 from owid.catalog import Dataset, Table, Variable
-from owid.catalog.variables import add_entry_to_processing_log
 from owid.datautils.common import ExceptionFromDocstring, warn_on_list_of_entities
 from owid.datautils.dataframes import groupby_agg, map_series
 from owid.datautils.io.json import load_json
@@ -446,11 +445,7 @@ def harmonize_countries(
     if isinstance(df_harmonized, Table):
         country_harmonized = Variable(
             country_harmonized, name=country_col, metadata=df_harmonized[country_col].metadata
-        )
-        country_harmonized.metadata.processing_log = add_entry_to_processing_log(
-            country_harmonized.metadata.processing_log,
-            variable_name=country_col,
-            parents=[df_harmonized[country_col]],
+        ).update_log(
             operation="harmonize",
         )
 

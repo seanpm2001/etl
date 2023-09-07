@@ -197,9 +197,10 @@ def preprocess_log(pl: ProcessingLog) -> ProcessingLog:
     last_r = None
     seen_r = set()
     for r in pl:
-        # TODO: this should never happen
+        # TODO: when is this happening??
         if str(r) in seen_r:
-            raise NotImplementedError("Fixme")
+            continue
+            # raise NotImplementedError("Fixme")
 
         if last_r and r.operation == "rename":
             # operation is just renaming, we can merge it with the previous one

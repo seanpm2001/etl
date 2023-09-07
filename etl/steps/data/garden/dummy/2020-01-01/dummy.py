@@ -26,6 +26,8 @@ def run(dest_dir: str) -> None:
 
     tb["dummy_variable"] = tb["dummy_variable"] / tb_population["population"]
 
+    tb["c"] = tb["dummy_variable"] + tb["yummy_variable"]
+
     #
     # Process data.
     #

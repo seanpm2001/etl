@@ -16,7 +16,7 @@ def run(dest_dir: str) -> None:
     # Load data from snapshot.
     tb = snap.read()
 
-    tb["dummy_variable"] += 1
+    tb["dummy_variable"] += 3
 
     tb["yummy_variable"] = tb["dummy_variable"] * 2
 
@@ -38,7 +38,9 @@ def run(dest_dir: str) -> None:
     # Process data.
     #
     # Create a new table and ensure all columns are snake-case.
-    tb = tb.underscore().set_index(["country", "year"], verify_integrity=True)
+    tb = tb.underscore()
+
+    tb = tb.set_index(["country", "year"], verify_integrity=True)
 
     #
     # Save outputs.
