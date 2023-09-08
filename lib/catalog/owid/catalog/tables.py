@@ -114,6 +114,11 @@ class Table(pd.DataFrame):
             self.metadata = copy.metadata
 
     @property
+    def m(self) -> TableMeta:
+        """Metadata alias to save typing."""
+        return self.metadata
+
+    @property
     def primary_key(self) -> List[str]:
         return [n for n in self.index.names if n]
 
@@ -618,8 +623,8 @@ class Table(pd.DataFrame):
         tb = super().dropna(*args, **kwargs).copy()
         for column in list(tb.all_columns):
             tb._fields[column].processing_log.add_entry(
-                variable_name=column,
-                parents=[column],
+                variable=column,
+                parents=[tb[column]],
                 operation="dropna",
             )
 
@@ -650,7 +655,14 @@ class Table(pd.DataFrame):
     def sort_values(self, by: str, *args, **kwargs) -> "Table":
         tb = super().sort_values(by=by, *args, **kwargs).copy()
         for column in list(tb.all_columns):
-            tb._fields[column].processing_log.add_entry(variable=column, parents=[by], operation="sort")
+            if isinstance(by, str):
+                parents = [by, column]
+            else:
+                parents = by + [column]
+
+            parent_variables = [tb[parent] for parent in parents]
+
+            tb._fields[column].processing_log.add_entry(variable=column, parents=parent_variables, operation="sort")
 
         return cast("Table", tb)
 
@@ -678,7 +690,7 @@ class Table(pd.DataFrame):
         # tb = update_log(table=tb, operation="+", parents=[other], variable_names=tb.columns)
         # Instead, update the processing log of each variable in the table.
         for column in tb.columns:
-            tb[column].update_log(parents=[column, other], operation="+", variable_name=column)
+            tb[column].update_log(parents=[tb[column], other], operation="+", variable_name=column)
         return tb
 
     def __iadd__(self, other: Union[Scalar, Series, variables.Variable]) -> "Table":
@@ -687,7 +699,7 @@ class Table(pd.DataFrame):
     def __sub__(self, other: Union[Scalar, Series, variables.Variable]) -> "Table":
         tb = cast(Table, Table(super().__sub__(other=other)).copy_metadata(self))
         for column in tb.columns:
-            tb[column].update_log(parents=[column, other], operation="-", variable_name=column)
+            tb[column].update_log(parents=[tb[column], other], operation="-", variable_name=column)
         return tb
 
     def __isub__(self, other: Union[Scalar, Series, variables.Variable]) -> "Table":
@@ -696,7 +708,7 @@ class Table(pd.DataFrame):
     def __mul__(self, other: Union[Scalar, Series, variables.Variable]) -> "Table":
         tb = cast(Table, Table(super().__mul__(other=other)).copy_metadata(self))
         for column in tb.columns:
-            tb[column].update_log(parents=[column, other], operation="*", variable_name=column)
+            tb[column].update_log(parents=[tb[column], other], operation="*", variable_name=column)
         return tb
 
     def __imul__(self, other: Union[Scalar, Series, variables.Variable]) -> "Table":
@@ -705,7 +717,7 @@ class Table(pd.DataFrame):
     def __truediv__(self, other: Union[Scalar, Series, variables.Variable]) -> "Table":
         tb = cast(Table, Table(super().__truediv__(other=other)).copy_metadata(self))
         for column in tb.columns:
-            tb[column].update_log(parents=[column, other], operation="/", variable_name=column)
+            tb[column].update_log(parents=[tb[column], other], operation="/", variable_name=column)
         return tb
 
     def __itruediv__(self, other: Union[Scalar, Series, variables.Variable]) -> "Table":
@@ -714,7 +726,7 @@ class Table(pd.DataFrame):
     def __floordiv__(self, other: Union[Scalar, Series, variables.Variable]) -> "Table":
         tb = cast(Table, Table(super().__floordiv__(other=other)).copy_metadata(self))
         for column in tb.columns:
-            tb[column].update_log(parents=[column, other], operation="//", variable_name=column)
+            tb[column].update_log(parents=[tb[column], other], operation="//", variable_name=column)
         return tb
 
     def __ifloordiv__(self, other: Union[Scalar, Series, variables.Variable]) -> "Table":
@@ -723,7 +735,7 @@ class Table(pd.DataFrame):
     def __mod__(self, other: Union[Scalar, Series, variables.Variable]) -> "Table":
         tb = cast(Table, Table(super().__mod__(other=other)).copy_metadata(self))
         for column in tb.columns:
-            tb[column].update_log(parents=[column, other], operation="%", variable_name=column)
+            tb[column].update_log(parents=[tb[column], other], operation="%", variable_name=column)
         return tb
 
     def __imod__(self, other: Union[Scalar, Series, variables.Variable]) -> "Table":
@@ -732,11 +744,59 @@ class Table(pd.DataFrame):
     def __pow__(self, other: Union[Scalar, Series, variables.Variable]) -> "Table":
         tb = cast(Table, Table(super().__pow__(other=other)).copy_metadata(self))
         for column in tb.columns:
-            tb[column].update_log(variable=tb[column], parents=[column, other], operation="**", variable_name=column)
+            tb[column].update_log(
+                variable=tb[column], parents=[tb[column], other], operation="**", variable_name=column
+            )
         return tb
 
     def __ipow__(self, other: Union[Scalar, Series, variables.Variable]) -> "Table":
         return self.__pow__(other)
+
+    def groupby(self, *args, **kwargs) -> "TableGroupBy":
+        return TableGroupBy(super().groupby(*args, **kwargs), self.metadata, self._fields)
+
+
+class TableGroupBy:
+    # fixes type hints
+    __annotations__ = {}
+
+    def __init__(self, groupby: pd.core.groupby.DataFrameGroupBy, metadata: TableMeta, fields: Dict[str, Any]):
+        self.groupby = groupby
+        self.metadata = metadata
+        self._fields = fields
+
+    def __getattr__(self, name) -> "VariableGroupBy":
+        self.__annotations__[name] = VariableGroupBy
+        return VariableGroupBy(getattr(self.groupby, name), name, self._fields[name])
+
+    def agg(self, func: Dict[str, Any], *args, **kwargs) -> "Table":
+        assert isinstance(func, dict)
+        tb = Table(self.groupby.agg(func, *args, **kwargs), metadata=self.metadata.copy())
+        tb._fields = {k: v.copy() for k, v in self._fields.items()}
+
+        # add processing log
+        for k, op in func.items():
+            if not isinstance(op, str):
+                op = op.__name__
+            tb[k].update_log(
+                operation=f"agg - {op}",
+            )
+        return tb
+
+
+class VariableGroupBy:
+    def __init__(self, groupby: pd.core.groupby.SeriesGroupBy, name: str, metadata: VariableMeta):
+        self.groupby = groupby
+        self.metadata = metadata
+        self.name = name
+
+    def __getattr__(self, funcname):
+        def func(*args, **kwargs):
+            """Apply function and return variable with proper metadata."""
+            out = getattr(self.groupby, funcname)(*args, **kwargs)
+            return variables.Variable(out, name=self.name, metadata=self.metadata)
+
+        return func
 
 
 def merge(

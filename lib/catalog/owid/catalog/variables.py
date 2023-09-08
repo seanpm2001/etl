@@ -99,6 +99,11 @@ class Variable(pd.Series):
         super().__init__(data=data, index=index, name=name, **kwargs)
 
     @property
+    def m(self) -> VariableMeta:
+        """Metadata alias to save typing."""
+        return self.metadata
+
+    @property
     def name(self) -> Optional[str]:
         return self._name
 

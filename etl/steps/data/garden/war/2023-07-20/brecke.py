@@ -10,6 +10,7 @@ Conflicts in this dataset always occur in the same region, and have the same con
 from typing import cast
 
 import numpy as np
+import owid.catalog.processing as pr
 import pandas as pd
 from owid.catalog import Dataset, Table
 from structlog import get_logger
@@ -106,10 +107,6 @@ def run(dest_dir: str) -> None:
     # Set index
     log.info("war.brecke: set index")
     tb = tb.set_index(["year", "region", "conflict_type"], verify_integrity=True)
-
-    # Add short_name to table
-    log.info("war.brecke: add shortname to table")
-    tb = Table(tb, short_name=paths.short_name)
 
     #
     # Save outputs.
@@ -220,13 +217,13 @@ def expand_observations(tb: Table) -> Table:
         Here, each conflict has as many rows as years of activity. Its deaths have been uniformly distributed among the years of activity.
     """
     # For that we scale the number of deaths proportional to the duration of the conflict.
-    tb[["totalfatalities"]] = tb[["totalfatalities"]].div(tb["endyear"] - tb["startyear"] + 1, "index").round()
+    conflict_length = tb["endyear"] - tb["startyear"] + 1
+    tb["totalfatalities"] = (tb["totalfatalities"] / conflict_length).round()
 
     # Add missing years for each triplet ("warcode", "campcode", "ccode")
     YEAR_MIN = tb["startyear"].min()
     YEAR_MAX = tb["endyear"].max()
-    tb_all_years = pd.DataFrame(pd.RangeIndex(YEAR_MIN, YEAR_MAX + 1), columns=["year"])
-    tb = pd.DataFrame(tb)  # to prevent error "AttributeError: 'DataFrame' object has no attribute 'all_columns'"
+    tb_all_years = Table(pd.RangeIndex(YEAR_MIN, YEAR_MAX + 1), columns=["year"])
     tb = tb.merge(tb_all_years, how="cross")
     # Filter only entries that actually existed
     tb = tb[(tb["year"] >= tb["startyear"]) & (tb["year"] <= tb["endyear"])]
@@ -293,9 +290,11 @@ def _add_ongoing_metrics(tb: Table) -> Table:
     tb_ongoing_world_all_conf["conflict_type"] = "all"
 
     ## Add region=World
-    tb_ongoing = pd.concat([tb_ongoing, tb_ongoing_all_conf, tb_ongoing_world, tb_ongoing_world_all_conf], ignore_index=True).sort_values(  # type: ignore
-        by=["year", "region", "conflict_type"]
+    tb_concat = pr.concat(
+        [tb_ongoing, tb_ongoing_all_conf, tb_ongoing_world, tb_ongoing_world_all_conf], ignore_index=True
     )
+
+    tb_ongoing = tb_concat.sort_values(by=["year", "region", "conflict_type"])  # type: ignore
 
     ## Rename columns
     tb_ongoing = tb_ongoing.rename(  # type: ignore
@@ -328,7 +327,7 @@ def _add_new_metrics(tb: Table) -> Table:
     tb_new_world_all_conf["conflict_type"] = "all"
 
     ## Combine
-    tb_new = pd.concat([tb_new, tb_new_all_conf, tb_new_world, tb_new_world_all_conf], ignore_index=True).sort_values(  # type: ignore
+    tb_new = pr.concat([tb_new, tb_new_all_conf, tb_new_world, tb_new_world_all_conf], ignore_index=True).sort_values(  # type: ignore
         by=["startyear", "region", "conflict_type"]
     )
 

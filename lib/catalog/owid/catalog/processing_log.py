@@ -204,7 +204,8 @@ def preprocess_log(pl: ProcessingLog) -> ProcessingLog:
 
         if last_r and r.operation == "rename":
             # operation is just renaming, we can merge it with the previous one
-            if last_r.target == r.parents[0]:
+            # exclude sort, that one is nicer to keep
+            if last_r.target == r.parents[0] and last_r.operation != "sort":
                 new_pl[-1] = last_r.clone(target=r.target, variable=r.variable)
                 continue
 
