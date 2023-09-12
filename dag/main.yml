@@ -309,6 +309,11 @@ steps:
     - data://explorers/wid/2023-08-24/world_inequality_database
     - data://explorers/lis/2023-08-30/luxembourg_income_study
 
+  # Poverty and inequality dataset for export
+  data://explorers/poverty_inequality/2023-08-24/poverty_inequality_export:
+  - data://garden/lis/2023-08-30/luxembourg_income_study
+  - data://garden/wid/2023-08-24/world_inequality_database
+
   # Global mobile money dataset (GSMA)
   data://meadow/technology/2023-03-06/mobile_money:
     - snapshot://technology/2023-03-06/mobile_money.xlsx
