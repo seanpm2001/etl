@@ -65,7 +65,9 @@ def run(dest_dir: str) -> None:
 
     # Add the column series_code, which is the concatenation of welfare, equivalization and indicator_name
     tb_lis_percentiles["series_code"] = (
-        "lis_"
+        tb_lis_percentiles["indicator_name"].astype(str)
+        + "_"
+        + "lis_"
         + tb_lis_percentiles["welfare"].astype(str)
         + "_"
         + tb_lis_percentiles["equivalization"].astype(str)
@@ -78,8 +80,21 @@ def run(dest_dir: str) -> None:
         tb_lis_percentiles["series_code"].str.replace("_2017ppp2017", ""),
     )
 
-    # Remove columns welfare and equivalization
-    tb_lis_percentiles = tb_lis_percentiles.drop(columns=["welfare", "equivalization"])
+    # Add descriptive columns
+    tb_lis_percentiles["source"] = "LIS"
+    tb_lis_percentiles["welfare"] = tb_lis_percentiles["welfare"].replace(
+        {"market": "Market income", "disposable": "Disposable income"}
+    )
+    tb_lis_percentiles["equivalization"] = tb_lis_percentiles["equivalization"].replace(
+        {"equivalized": "Equivalized", "perCapita": "Per capita"}
+    )
+
+    # Rename columns
+    tb_lis_percentiles = tb_lis_percentiles.rename({"equivalization": "resource_sharing"})
+    # Add column prices, and assign it the value 2017 PPPs, at 2017 prices only for indicator names different from share
+    tb_lis_percentiles["prices"] = tb_lis_percentiles["indicator_name"].where(
+        tb_lis_percentiles["indicator_name"] == "share", "2017 PPPs, at 2017 prices"
+    )
 
     # WID PERCENTILES
 
@@ -141,6 +156,8 @@ def run(dest_dir: str) -> None:
         ~tb_wid_percentiles["indicator_name"].str.contains("extrapolated")
     ].reset_index(drop=True)
 
+    #
+
     # Concatenate all the tables
     tb = pr.concat(
         [tb_lis_percentiles, tb_wid_percentiles, tb_wid_percentiles_extrapolated],
@@ -153,7 +170,18 @@ def run(dest_dir: str) -> None:
     # Set index
     tb = tb.set_index(["country", "year", "series_code", "percentile", "indicator_name"], verify_integrity=True)
     tb_lis_percentiles = tb_lis_percentiles.set_index(
-        ["country", "year", "series_code", "percentile", "indicator_name"], verify_integrity=True
+        [
+            "country",
+            "year",
+            "series_code",
+            "percentile",
+            "indicator_name",
+            "source",
+            "welfare",
+            "resource_sharing",
+            "prices",
+        ],
+        verify_integrity=True,
     )
     tb_wid_percentiles = tb_wid_percentiles.set_index(
         ["country", "year", "series_code", "percentile", "indicator_name"], verify_integrity=True
