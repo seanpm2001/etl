@@ -8,7 +8,7 @@ from owid.catalog.utils import underscore
 from sqlalchemy.engine import Engine
 
 from apps.backport.backport import PotentialBackport
-from apps.walkthrough.utils import add_to_dag, generate_step
+from apps.wizard.utils import add_to_dag, generate_step
 from etl import config
 from etl.backport_helpers import create_dataset
 from etl.db import get_engine
@@ -126,7 +126,7 @@ def migrate(
 
     print(f"Execute snapshot with `python snapshots/{namespace}/{version}/{short_name}.py`")
     print(f"Import dataset with `etl {namespace}/{version}/{short_name} --grapher`")
-    print("Run chart revisions with `ENV=.env.prod.write walkthrough charts`")
+    print("Run chart revisions with `ENV=.env.prod.write etl-wizard charts`")
 
 
 def _add_to_migrated_dag(namespace: str, version: str, short_name: str):
